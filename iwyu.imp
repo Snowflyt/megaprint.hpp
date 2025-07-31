@@ -1,0 +1,34 @@
+[
+  {
+    "include": [
+      "@<__math/.*>",
+      "private",
+      "<cmath>",
+      "public"
+    ]
+  },
+  {
+    "include": [
+      "@<__math/.*>",
+      "private",
+      "<math.h>",
+      "public"
+    ]
+  },
+  {
+    "include": [
+      "@<__vector/.*>",
+      "private",
+      "<vector>",
+      "public"
+    ]
+  },
+  {
+    "include": [
+      "@<bits/chrono.h>",
+      "private",
+      "<chrono>",
+      "public"
+    ]
+  }
+]
