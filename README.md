@@ -32,7 +32,7 @@
 
   ```cmake
   include(CPM.cmake)
-  CPMAddPackage("gh:Snowflyt/megaprint.hpp@0.1.0") # or above
+  CPMAddPackage("gh:Snowflyt/megaprint.hpp@0.1.1") # or above
   target_link_libraries(your_target_name PRIVATE megaprint::megaprint)
   ```
 
