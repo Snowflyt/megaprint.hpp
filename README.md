@@ -20,7 +20,7 @@
 - **Header-only** library. Grab a copy of `include/megaprint/megaprint.hpp` and include it in your project.
 - Very **easy to use**. Just call `mp::println(...)` with your data like you call `print` in Python or `console.log` in JavaScript, and it will print everything in a pretty format.
 - Inspect [aggregate types](https://en.cppreference.com/w/cpp/language/aggregate_initialization) with **field names**, enumerations with **enum names**, and **various STL types** including **smart pointers**, `std::vector`, `std::unordered_map`, `std::tuple`, `std::variant`, and more.
-- **Human-readable** results with **auto indentation** and **line breaking** for long outputs, **ANSI color** support, and **circular references** displayed with a **reference pointer** (e.g., `<ref *1> Foo{.foo = Bar{.bar = [Circular *1]}}`).
+- **Human-readable** results with **auto indentation** and **line breaking** for long outputs, **ANSI color** support, and **circular references** displayed with a **reference pointer** (e.g., `<ref *1> Foo { foo: Bar { bar: [Circular *1] } }`).
 - Highly **customizable options** for inspecting, indentation, line breaking, colors, user-defined types, and more.
 
 ## Quick Start
@@ -107,7 +107,7 @@ int main() {
 }
 ```
 
-… or by using `mp::inspect` with the same options:
+... or by using `mp::inspect` with the same options:
 
 ```cpp
 #include <vector>
@@ -145,8 +145,6 @@ The output will be:
 >
 > To invoke `mp::inspect` with global options applied, pass the first type argument as `true`, i.e., `mp::inspect<true>(value, options...)`.
 
-For more information, check the [examples](examples/) and comments for `mp::inspect_options` in the header file.
-
 `mp::set_options(options...)` and `mp::inspect(value, option...)` accept the same options, which are defined in the `mp::option` namespace. Some common options are listed here:
 
 - **`depth`**: Maximum recursion depth, defaults to `std::numeric_limits<std::size_t>::max()`.
@@ -163,7 +161,7 @@ For more information, check the [examples](examples/) and comments for `mp::insp
 ### Limitations
 
 - megaprint’s field reflection implementation is adapted from [Boost.PFR](https://github.com/boostorg/pfr), so only simple [aggregate types](https://cppreference.com/w/cpp/language/aggregate_initialization.html) are supported. These are structs and classes with only public data members, no base classes, and no user-defined constructors or destructors. For other types, the output will fallback to `[TypeName@address]`, e.g., `[Foo@deadbeef]`. You can implement a `.inspect()` method for your class to provide custom inspection output. See the [Custom User-Defined Types](#custom-user-defined-types) section for more details.
-- Due to Boost.PFR limitations, megaprint may fail to compile for certain types, even when it should compile with fallback inspection output. For example, structs with a `std::vector<std::unique_ptr<T>>` field will fail to compile in C++ ≥ 20. This happens because megaprint uses `if constexpr` to decide how to inspect a type, and in some corner cases, it thinks a type is a simple aggregate type when it’s actually not. This is a limitation of the current implementation. If you encounter this issue, you can provide a custom `.inspect()` method for your type to bypass the limitation. A `mp::inspect_fallback` function is provided to help implement fallback inspection output — simply add a method `auto inspect(const auto& options) { return mp::inspect_fallback(*this, options); }`.
+- Due to Boost.PFR limitations, megaprint may fail to compile for certain types, even when it should compile with fallback inspection output. For example, structs with a `std::vector<std::unique_ptr<T>>` field will fail to compile with **Clang/MSVC** for C++ ≥ 20 (though **GCC** compiles these cases successfully). This happens because megaprint uses `if constexpr` to decide how to inspect a type, and in some corner cases, it thinks a type is a simple aggregate type when it’s actually not. This is a limitation of the current implementation and compiler-specific behavior. If you encounter this issue, you can provide a custom `.inspect()` method for your type to bypass the limitation. A `mp::inspect_fallback` function is provided to help implement fallback inspection output — simply add a method `auto inspect(const auto& options) { return mp::inspect_fallback(*this, options); }`.
 
 ### Supported Types
 
@@ -210,22 +208,22 @@ Check the [examples/](examples/) directory for more examples of supported types.
 
 **megaprint** automatically uses the `.inspect()` method of user-defined types to provide a custom inspection output. The member function signature can be one of the following:
 
-```c++
-inspect(const mp::inspect_options& options, const auto &expand)
-inspect(const mp::inspect_options& options)
-inpsect()
+```cpp
+inspect(const mp::inspect_method_options& options, const auto &expand)
+inspect(const mp::inspect_method_options& options)
+inspect()
 ```
 
 The function signature of `expand` is like `mp::inspect`, by returning a `std::unique_ptr<mp::node::node>` instead of `std::string`:
 
-```c++
+```cpp
 template <typename V, typename... Os>
 std::unique_ptr<mp::node::node> expand(V &&v, Os &&...opts);
 ```
 
 You may wonder what `mp::node::node` is. A `node` is a tree-like structure that represents the value to be stringified:
 
-```c++
+```cpp
 using node = std::variant<circular_node, text_node, inline_wrap_node, sequence_node, between_node>;
 
 struct circular_node {
@@ -274,7 +272,7 @@ The return type of the `.inspect` method can be one of the following:
 
 You can create the `.inspect()` method for your own types like this:
 
-```javascript
+```cpp
 #include <megaprint/megaprint.hpp>
 
 template <typename T> class Box {
@@ -333,11 +331,11 @@ int main() {
 }
 ```
 
-The above examples show how to use custom serializers to display `Point` and `Box` objects in a custom format. `Point`s are formatted as `Point(x, y)`, and `Box`s are formatted as `Box(...)`.
+The above examples show how to use custom inspect methods to display `Point` and `Box` objects in a custom format. `Point`s are formatted as `Point(x, y)`, and `Box`s are formatted as `Box(...)`.
 
 We’ve seen how to use `text` and `sequence` to build simple nodes. There are other nodes we haven’t used yet. Here’s a brief introduction to all these nodes:
 
-- **`circular`**: Represents a circular reference. Normally, you don’t need to create this node manually in a serializer. All nodes returned by a custom serializer automatically get a `ref` property, which helps detect circular references.
+- **`circular`**: Represents a circular reference. Normally, you don’t need to create this node manually in your inspect method. All nodes returned by a custom inspect method automatically get a `ref` property, which helps detect circular references.
 - **`text`**: Represents a text node. The `value` property holds the text to be displayed.
 - **`inline_wrap`**: Represents a “variant” node. Some objects format differently depending on whether they are inline or multiline. For example, when `trailing_comma` is `auto_`, a trailing comma is added only when the last item is on a separate line. This can be represented with `inline_wrap(inline_node, multiline_node)`.
 - **`sequence`**: Represents a sequence of nodes. The `values` property is an array of nodes to be displayed in order. Unlike `between`, `sequence` does not break lines between nodes.
@@ -345,7 +343,7 @@ We’ve seen how to use `text` and `sequence` to build simple nodes. There are o
 
 So far, you might wonder how `sequence` and `between` differ. Let’s use a custom `Pair` class as an example to demonstrate the difference:
 
-```javascript
+```cpp
 template <typename T, typename U> class Pair1 {
 public:
   Pair1(T left, U right) : left_(std::move(left)), right_(std::move(right)) {}
@@ -380,7 +378,7 @@ private:
 
 At first glance, `Pair1` and `Pair2` seem identical, and they produce the same output for short values:
 
-```javascript
+```cpp
 const Pair1 p1{"left", "right"};
 const Pair2 p2{"left", "right"};
 
@@ -392,7 +390,7 @@ mp::println(p2);
 
 However, they behave differently when the `Pair` object is displayed in multiline format:
 
-```javascript
+```cpp
 const std::string s1 = "This is a very long string that will break the line";
 const std::string s2 = "This is another very long string that will break the line";
 
@@ -412,7 +410,7 @@ Although the inline format exceeds the `break_length` limit, `Pair1` does not br
 
 Here’s a more interesting example where child nodes themselves can be multiline:
 
-```javascript
+```cpp
 struct FooBarBaz {
   std::string foo;
   std::string bar;
@@ -420,7 +418,7 @@ struct FooBarBaz {
 };
 
 int main() {
-const FooBarBaz obj1 = {.foo = "bar", .bar = "baz", .baz = "quxx"};
+  const FooBarBaz obj1 = {.foo = "bar", .bar = "baz", .baz = "quxx"};
   const FooBarBaz obj2 = {.foo = "baz", .bar = "bar", .baz = "foo"};
 
   const Pair1 p5{obj1, obj2};
@@ -450,7 +448,7 @@ While the outputs might be different from what you expect, the underlying princi
 
 `Pair2` is still not “good” enough — the separator is still `", "` (with a space after) when multiline, which is not what we want. We can use `inline_wrap` to solve this problem:
 
-```javascript
+```cpp
 template <typename T, typename U> class Pair3 {
 public:
   Pair3(T left, U right) : left_(std::move(left)), right_(std::move(right)) {}
@@ -487,7 +485,7 @@ The `options` argument and the second optional argument in `expand` are almost i
 
 Here’s an example showing how to use the `options` argument in `.inspect()` and `expand`:
 
-```javascript
+```cpp
 template <typename T> class Wrapper {
 public:
   explicit Wrapper(std::string_view tag, T value) : tag_(tag), value_(std::move(value)) {}
