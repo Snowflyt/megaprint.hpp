@@ -333,6 +333,23 @@ int main() {
 
 The above examples show how to use custom inspect methods to display `Point` and `Box` objects in a custom format. `Point`s are formatted as `Point(x, y)`, and `Box`s are formatted as `Box(...)`.
 
+Alternatively, if you are building your own library and want to support **megaprint**, but don’t want to include `megaprint.hpp` in your library, you can use the helper functions in `options.n`, which are exactly the same as the ones in `mp::node`, to build the tree of nodes. This way, you can keep your library independent of **megaprint** while still providing custom inspection output.
+
+```c++
+template <typename T> class Box {
+public:
+  explicit Box(T value) : value_(std::move(value)) {}
+
+  [[nodiscard]] auto inspect(const auto &options, const auto &expand) const {
+    const auto& n = options.n;
+    return n.sequence(n.text("Box("), expand(value_), n.text(")"));
+  }
+
+private:
+  T value_;
+};
+```
+
 We’ve seen how to use `text` and `sequence` to build simple nodes. There are other nodes we haven’t used yet. Here’s a brief introduction to all these nodes:
 
 - **`circular`**: Represents a circular reference. Normally, you don’t need to create this node manually in your inspect method. All nodes returned by a custom inspect method automatically get a `ref` property, which helps detect circular references.
@@ -480,6 +497,7 @@ The `options` argument and the second optional argument in `expand` are almost i
 - `level` is available in `inspect_method_options`, indicating the current depth of the object being inspected.
 - `ancestors` is available in `inspect_method_options`, which is an array of the ancestors of the current value. This is useful for detecting circular references.
 - An object named `c` is available in `inspect_method_options`, containing functions to colorize strings using ANSI colors. These functions are similar to the JavaScript library [chalk](https://github.com/chalk/chalk), such as `c.bold`, `c.cyan`, and so on, as well as `c.number`, `c.special`, etc., which are aliases for corresponding styles in the `styles` option. Note that when `colors` is `false`, all color functions are no-op functions that return the input string unchanged.
+- A struct `n` with node manipulation functions is available in `inspect_method_options`, which contains the same functions as the `mp::node` namespace, such as `n.text`, `n.sequence`, `n.between`, etc. This allows you to build nodes without needing to include the `megaprint.hpp` header in your code.
 
 **megaprint** automatically handles `level` increment in `expand`, and internally triggers a signal to stop recursion when `level` exceeds `depth`, so you don't need to worry about it. Circular references are also automatically detected — the current value is added to the `ancestors` array, and the `ref` property of each node returned is set to its type name and value to detect circular references. As shown earlier, since the tree of nodes is built in two stages, indentation and line breaking are handled by `between`, so you don't need to worry about those either.
 

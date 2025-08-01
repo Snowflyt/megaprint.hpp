@@ -1,5 +1,6 @@
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 
 #include <megaprint/megaprint.hpp>
@@ -56,12 +57,15 @@ template <typename T, typename U> class Pair2 {
 public:
   Pair2(T left, U right) : left_(std::move(left)), right_(std::move(right)) {}
 
-  [[nodiscard]] auto inspect(const auto & /*options*/, const auto &expand) const {
-    using namespace mp::node;
-    std::vector<std::unique_ptr<node>> children;
-    children.emplace_back(sequence(expand(left_), text(", ")));
+  [[nodiscard]] auto inspect(const auto &options, const auto &expand) const {
+    // Alternatively, you can use `options.n` to access node manipulation functions
+    // without needing to include the `megaprint.hpp` header in your code
+    const auto &n = options.n;
+    using node = std::invoke_result_t<decltype(n.text), std::string_view>;
+    std::vector<node> children;
+    children.emplace_back(n.sequence(expand(left_), n.text(", ")));
     children.emplace_back(expand(right_));
-    return between(std::move(children), text("("), text(")"));
+    return n.between(std::move(children), n.text("("), n.text(")"));
   }
 
 private:

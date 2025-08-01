@@ -3369,49 +3369,53 @@ struct between_node {
   mp::node::ref ref = {"", 0};
 };
 
-template <typename T> [[nodiscard]] inline auto circular(const T &value) -> std::unique_ptr<node> {
-  return std::make_unique<node>(
-      circular_node{.ref = {std::string(detail::type_name<std::remove_cvref_t<T>>()),
-                            reinterpret_cast<std::uintptr_t>(std::addressof(value))}});
+template <typename T>
+[[nodiscard]] inline auto circular(T &&value) -> std::unique_ptr<mp::node::node> {
+  return std::make_unique<mp::node::node>(circular_node{
+      .ref = {std::string(detail::type_name<std::remove_cvref_t<T>>()),
+              reinterpret_cast<std::uintptr_t>(std::addressof(std::forward<T>(value)))}});
 }
 
-[[nodiscard]] inline auto text(std::string_view value) -> std::unique_ptr<node> {
-  return std::make_unique<node>(text_node{.value = std::string(value)});
+[[nodiscard]] inline auto text(std::string_view value) -> std::unique_ptr<mp::node::node> {
+  return std::make_unique<mp::node::node>(text_node{.value = std::string(value)});
 }
 
-[[nodiscard]] inline auto inline_wrap(std::unique_ptr<node> inline_node,
-                                      std::unique_ptr<node> wrap_node) -> std::unique_ptr<node> {
-  return std::make_unique<node>(inline_wrap_node{
+[[nodiscard]] inline auto inline_wrap(std::unique_ptr<mp::node::node> inline_node,
+                                      std::unique_ptr<mp::node::node> wrap_node)
+    -> std::unique_ptr<mp::node::node> {
+  return std::make_unique<mp::node::node>(inline_wrap_node{
       .inline_node = std::move(inline_node),
       .wrap_node = std::move(wrap_node),
   });
 }
 
-[[nodiscard]] inline auto sequence(std::vector<std::unique_ptr<node>> &&values)
-    -> std::unique_ptr<node> {
-  return std::make_unique<node>(sequence_node{.values = std::move(values)});
+[[nodiscard]] inline auto sequence(std::vector<std::unique_ptr<mp::node::node>> &&values)
+    -> std::unique_ptr<mp::node::node> {
+  return std::make_unique<mp::node::node>(sequence_node{.values = std::move(values)});
 }
 
 template <typename... Ns>
-  requires(std::same_as<std::decay_t<Ns>, std::unique_ptr<node>> && ...)
-[[nodiscard]] inline auto sequence(Ns &&...nodes) -> std::unique_ptr<node> {
-  std::vector<std::unique_ptr<node>> vals;
+  requires(std::same_as<std::decay_t<Ns>, std::unique_ptr<mp::node::node>> && ...)
+[[nodiscard]] inline auto sequence(Ns &&...nodes) -> std::unique_ptr<mp::node::node> {
+  std::vector<std::unique_ptr<mp::node::node>> vals;
   vals.reserve(sizeof...(Ns));
   (vals.push_back(std::forward<Ns>(nodes)), ...);
-  return std::make_unique<node>(sequence_node{.values = std::move(vals)});
+  return std::make_unique<mp::node::node>(sequence_node{.values = std::move(vals)});
 }
 
-[[nodiscard]] inline auto between(std::vector<std::unique_ptr<node>> &&values,
-                                  std::unique_ptr<node> open = nullptr,
-                                  std::unique_ptr<node> close = nullptr) -> std::unique_ptr<node> {
-  return std::make_unique<node>(between_node{
+[[nodiscard]] inline auto between(std::vector<std::unique_ptr<mp::node::node>> &&values,
+                                  std::unique_ptr<mp::node::node> open = nullptr,
+                                  std::unique_ptr<mp::node::node> close = nullptr)
+    -> std::unique_ptr<mp::node::node> {
+  return std::make_unique<mp::node::node>(between_node{
       .values = std::move(values),
       .open = std::move(open),
       .close = std::move(close),
   });
 }
 
-[[nodiscard]] inline auto clone_node(const node &node) -> std::unique_ptr<mp::node::node> {
+[[nodiscard]] inline auto clone_node(const mp::node::node &node)
+    -> std::unique_ptr<mp::node::node> {
   return std::visit(
       [](auto &&node) -> std::unique_ptr<mp::node::node> {
         using V = std::decay_t<decltype(node)>;
@@ -3446,6 +3450,53 @@ template <typename... Ns>
 }
 
 } // namespace node
+
+namespace detail {
+
+// A struct containing helper functions for node manipulation.
+// This struct is passed as a member of inspect_method_options to allow other
+// libraries to support megaprint without including the megaprint.hpp header.
+struct n {
+  template <typename T>
+  [[nodiscard]] static auto circular(T &&value) -> std::unique_ptr<mp::node::node> {
+    return mp::node::circular(std::forward<T>(value));
+  }
+
+  [[nodiscard]] static auto text(std::string_view value) -> std::unique_ptr<mp::node::node> {
+    return mp::node::text(value);
+  }
+
+  [[nodiscard]] static auto inline_wrap(std::unique_ptr<mp::node::node> inline_node,
+                                        std::unique_ptr<mp::node::node> wrap_node)
+      -> std::unique_ptr<mp::node::node> {
+    return mp::node::inline_wrap(std::move(inline_node), std::move(wrap_node));
+  }
+
+  [[nodiscard]] static auto sequence(std::vector<std::unique_ptr<mp::node::node>> &&values)
+      -> std::unique_ptr<mp::node::node> {
+    return mp::node::sequence(std::move(values));
+  }
+
+  template <typename... Ns>
+    requires(std::same_as<std::decay_t<Ns>, std::unique_ptr<mp::node::node>> && ...)
+  [[nodiscard]] static auto sequence(Ns &&...nodes) -> std::unique_ptr<mp::node::node> {
+    return mp::node::sequence(std::forward<Ns>(nodes)...);
+  }
+
+  [[nodiscard]] static auto between(std::vector<std::unique_ptr<mp::node::node>> &&values,
+                                    std::unique_ptr<mp::node::node> open = nullptr,
+                                    std::unique_ptr<mp::node::node> close = nullptr)
+      -> std::unique_ptr<mp::node::node> {
+    return mp::node::between(std::move(values), std::move(open), std::move(close));
+  }
+
+  [[nodiscard]] static auto clone_node(const mp::node::node &node)
+      -> std::unique_ptr<mp::node::node> {
+    return mp::node::clone_node(node);
+  }
+};
+
+} // namespace detail
 
 namespace detail {
 
@@ -3808,6 +3859,10 @@ struct inspect_method_options {
    * @brief An struct that contains color functions.
    */
   detail::c c;
+  /**
+   * @brief An struct that contains node manipulation functions.
+   */
+  detail::n n;
 };
 
 template <typename T>
