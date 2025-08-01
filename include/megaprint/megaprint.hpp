@@ -3212,32 +3212,6 @@ struct styles {
 
 namespace detail {
 
-struct c {
-  /* Modifiers */
-  std::function<std::string(std::string_view)> bold;
-  std::function<std::string(std::string_view)> dim;
-  std::function<std::string(std::string_view)> reset;
-  /* Colors */
-  std::function<std::string(std::string_view)> black;
-  std::function<std::string(std::string_view)> blue;
-  std::function<std::string(std::string_view)> cyan;
-  std::function<std::string(std::string_view)> gray;
-  std::function<std::string(std::string_view)> green;
-  std::function<std::string(std::string_view)> magenta;
-  std::function<std::string(std::string_view)> red;
-  std::function<std::string(std::string_view)> white;
-  std::function<std::string(std::string_view)> yellow;
-
-  /* Styles */
-  std::function<std::string(std::string_view)> string;
-  std::function<std::string(std::string_view)> character;
-  std::function<std::string(std::string_view)> number;
-  std::function<std::string(std::string_view)> boolean;
-  std::function<std::string(std::string_view)> enumeration;
-  std::function<std::string(std::string_view)> null;
-  std::function<std::string(std::string_view)> special;
-};
-
 [[nodiscard]] inline auto colorize(std::string_view s, color color) -> std::string {
   switch (color) {
   case color::bold:
@@ -3271,54 +3245,78 @@ struct c {
   return std::string(s); // Fallback to no color
 }
 
-[[nodiscard]] inline auto build_c(bool color_enabled, mp::styles styles) -> c {
-  c c;
+struct c {
+public:
+  explicit c() noexcept : enabled_(false), styles_() {}
+  explicit c(bool enabled, mp::styles styles) noexcept : enabled_(enabled), styles_(styles) {}
 
-  if (color_enabled) {
-    c.bold = [](std::string_view s) { return colorize(s, color::bold); };
-    c.dim = [](std::string_view s) { return colorize(s, color::dim); };
-    c.reset = [](std::string_view s) { return colorize(s, color::reset); };
-    c.black = [](std::string_view s) { return colorize(s, color::black); };
-    c.blue = [](std::string_view s) { return colorize(s, color::blue); };
-    c.cyan = [](std::string_view s) { return colorize(s, color::cyan); };
-    c.gray = [](std::string_view s) { return colorize(s, color::gray); };
-    c.green = [](std::string_view s) { return colorize(s, color::green); };
-    c.magenta = [](std::string_view s) { return colorize(s, color::magenta); };
-    c.red = [](std::string_view s) { return colorize(s, color::red); };
-    c.white = [](std::string_view s) { return colorize(s, color::white); };
-    c.yellow = [](std::string_view s) { return colorize(s, color::yellow); };
-
-    c.string = [styles](std::string_view s) { return colorize(s, styles.string); };
-    c.character = [styles](std::string_view s) { return colorize(s, styles.character); };
-    c.number = [styles](std::string_view s) { return colorize(s, styles.number); };
-    c.boolean = [styles](std::string_view s) { return colorize(s, styles.boolean); };
-    c.enumeration = [styles](std::string_view s) { return colorize(s, styles.enumeration); };
-    c.null = [styles](std::string_view s) { return colorize(s, styles.null); };
-    c.special = [styles](std::string_view s) { return colorize(s, styles.special); };
-  } else {
-    c.bold = [](std::string_view s) { return std::string(s); };
-    c.dim = [](std::string_view s) { return std::string(s); };
-    c.reset = [](std::string_view s) { return std::string(s); };
-    c.black = [](std::string_view s) { return std::string(s); };
-    c.blue = [](std::string_view s) { return std::string(s); };
-    c.cyan = [](std::string_view s) { return std::string(s); };
-    c.gray = [](std::string_view s) { return std::string(s); };
-    c.green = [](std::string_view s) { return std::string(s); };
-    c.magenta = [](std::string_view s) { return std::string(s); };
-    c.red = [](std::string_view s) { return std::string(s); };
-    c.white = [](std::string_view s) { return std::string(s); };
-    c.yellow = [](std::string_view s) { return std::string(s); };
-
-    c.string = [](std::string_view s) { return std::string(s); };
-    c.character = [](std::string_view s) { return std::string(s); };
-    c.number = [](std::string_view s) { return std::string(s); };
-    c.boolean = [](std::string_view s) { return std::string(s); };
-    c.enumeration = [](std::string_view s) { return std::string(s); };
-    c.null = [](std::string_view s) { return std::string(s); };
-    c.special = [](std::string_view s) { return std::string(s); };
+  // Modifiers
+  [[nodiscard]] auto bold(std::string_view s) const -> std::string {
+    return enabled_ ? colorize(s, color::bold) : std::string(s);
   }
-  return c;
-}
+  [[nodiscard]] auto dim(std::string_view s) const -> std::string {
+    return enabled_ ? colorize(s, color::dim) : std::string(s);
+  }
+  [[nodiscard]] auto reset(std::string_view s) const -> std::string {
+    return enabled_ ? colorize(s, color::reset) : std::string(s);
+  }
+
+  // Colors
+  [[nodiscard]] auto black(std::string_view s) const -> std::string {
+    return enabled_ ? colorize(s, color::black) : std::string(s);
+  }
+  [[nodiscard]] auto blue(std::string_view s) const -> std::string {
+    return enabled_ ? colorize(s, color::blue) : std::string(s);
+  }
+  [[nodiscard]] auto cyan(std::string_view s) const -> std::string {
+    return enabled_ ? colorize(s, color::cyan) : std::string(s);
+  }
+  [[nodiscard]] auto gray(std::string_view s) const -> std::string {
+    return enabled_ ? colorize(s, color::gray) : std::string(s);
+  }
+  [[nodiscard]] auto green(std::string_view s) const -> std::string {
+    return enabled_ ? colorize(s, color::green) : std::string(s);
+  }
+  [[nodiscard]] auto magenta(std::string_view s) const -> std::string {
+    return enabled_ ? colorize(s, color::magenta) : std::string(s);
+  }
+  [[nodiscard]] auto red(std::string_view s) const -> std::string {
+    return enabled_ ? colorize(s, color::red) : std::string(s);
+  }
+  [[nodiscard]] auto white(std::string_view s) const -> std::string {
+    return enabled_ ? colorize(s, color::white) : std::string(s);
+  }
+  [[nodiscard]] auto yellow(std::string_view s) const -> std::string {
+    return enabled_ ? colorize(s, color::yellow) : std::string(s);
+  }
+
+  // Styles (use user-provided mapping)
+  [[nodiscard]] auto string(std::string_view s) const -> std::string {
+    return enabled_ ? colorize(s, styles_.string) : std::string(s);
+  }
+  [[nodiscard]] auto character(std::string_view s) const -> std::string {
+    return enabled_ ? colorize(s, styles_.character) : std::string(s);
+  }
+  [[nodiscard]] auto number(std::string_view s) const -> std::string {
+    return enabled_ ? colorize(s, styles_.number) : std::string(s);
+  }
+  [[nodiscard]] auto boolean(std::string_view s) const -> std::string {
+    return enabled_ ? colorize(s, styles_.boolean) : std::string(s);
+  }
+  [[nodiscard]] auto enumeration(std::string_view s) const -> std::string {
+    return enabled_ ? colorize(s, styles_.enumeration) : std::string(s);
+  }
+  [[nodiscard]] auto null(std::string_view s) const -> std::string {
+    return enabled_ ? colorize(s, styles_.null) : std::string(s);
+  }
+  [[nodiscard]] auto special(std::string_view s) const -> std::string {
+    return enabled_ ? colorize(s, styles_.special) : std::string(s);
+  }
+
+private:
+  bool enabled_;
+  mp::styles styles_;
+};
 
 } // namespace detail
 
@@ -3668,29 +3666,33 @@ using ancestors = detail::setting<std::deque<node::ref>, detail::option_tag::anc
 
 namespace detail {
 
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables, cert-err58-cpp)
-inline std::unordered_map<std::string, std::any> default_options = []() {
-  std::unordered_map<std::string, std::any> options;
+// Declare default_options as a function to avoid unnecessary static initialization
+// when `mp::println(...)` is only used to print simple types.
+[[nodiscard]] inline auto default_options() -> std::unordered_map<std::string, std::any> & {
+  static auto options = []() {
+    std::unordered_map<std::string, std::any> opts;
 
-  // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
-  auto set_option = [&options]<typename O>(O &&option) {
-    options[std::string(enum_name<detail::option_tag, O::tag>())] = option.value;
-  };
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+    auto set = [&opts]<typename O>(O &&opt) {
+      opts[std::string(enum_name<option_tag, O::tag>())] = opt.value;
+    };
 
-  set_option(option::colors{detail::supports_ansi()});
-  set_option(option::indent{2});
-  set_option(option::depth{4});
+    set(option::colors{supports_ansi()});
+    set(option::indent{2});
+    set(option::depth{4});
 
+    return opts;
+  }();
   return options;
-}();
+}
 
 template <typename T> inline void patch_options_with_global_default_options(T &options) {
   constexpr std::size_t fields_count = count_fields<T>();
   const auto fields = tie_as_tuple(options, size_t_<fields_count>{});
 
   auto try_set_field = [&fields]<std::size_t I>(std::integral_constant<std::size_t, I> /*index*/) {
-    if (const auto it = default_options.find(std::string(field_name<T, I>()));
-        it != default_options.end()) {
+    auto &map = default_options();
+    if (const auto it = map.find(std::string(field_name<T, I>())); it != map.end()) {
       auto &field = sequence_tuple::get<I>(fields);
       field = std::any_cast<std::remove_cvref_t<decltype(field)>>(it->second);
       return;
@@ -3707,10 +3709,10 @@ template <typename T> inline void patch_options_with_global_default_options(T &o
 template <typename... Os>
   requires(std::is_base_of_v<detail::setting<typename Os::type, Os::tag>, Os> && ...)
 inline void set_options(Os &&...options) {
+  auto &map = detail::default_options();
   // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
-  auto set_option = []<typename O>(O &&option) {
-    detail::default_options[std::string(detail::enum_name<detail::option_tag, O::tag>())] =
-        option.value;
+  auto set_option = [&map]<typename O>(O &&option) {
+    map[std::string(detail::enum_name<detail::option_tag, O::tag>())] = option.value;
   };
   (set_option(std::forward<Os>(options)), ...);
 }
@@ -4078,6 +4080,47 @@ auto stringify_number(T value, std::variant<bool, std::string_view> numeric_sepa
   return oss.str();
 }
 
+// Stringify simple types to avoid unnecessary template instantiations when
+// `mp::println(...)` is only used to print simple types.
+template <typename T>
+concept simple_type =
+    std::is_enum_v<std::remove_cvref_t<T>> || std::same_as<std::remove_cvref_t<T>, char> ||
+    std::same_as<std::remove_cvref_t<T>, signed char> ||
+    std::same_as<std::remove_cvref_t<T>, unsigned char> ||
+    std::same_as<std::remove_cvref_t<T>, wchar_t> ||
+    std::same_as<std::remove_cvref_t<T>, char8_t> ||
+    std::same_as<std::remove_cvref_t<T>, char16_t> ||
+    std::same_as<std::remove_cvref_t<T>, char32_t> ||
+    std::same_as<std::remove_cvref_t<T>, std::filesystem::path> ||
+    std::same_as<std::remove_cvref_t<T>, bool> || std::is_arithmetic_v<std::remove_cvref_t<T>> ||
+    detail::is_specialization_v<std::remove_cvref_t<T>, std::complex>;
+
+template <simple_type T>
+[[nodiscard]] inline auto stringify_simple(T &&value, const detail::c &c,
+                                           std::variant<bool, std::string_view> numeric_separator)
+    -> std::string {
+  using U = std::remove_cvref_t<T>;
+
+  if constexpr (std::is_enum_v<U>) {
+    return c.enumeration(std::string(enum_type_name_with_name(std::forward<T>(value))));
+  } else if constexpr (std::same_as<U, char> || std::same_as<U, signed char> ||
+                       std::same_as<U, unsigned char> || std::same_as<U, wchar_t> ||
+                       std::same_as<U, char8_t> || std::same_as<U, char16_t> ||
+                       std::same_as<U, char32_t>) {
+    return c.character(stringify_string(std::string(1, std::forward<T>(value)), '\''));
+  } else if constexpr (std::same_as<U, std::filesystem::path>) {
+    return "path(" + c.string(stringify_string(value.lexically_normal().string())) + ")";
+  } else if constexpr (std::same_as<U, bool>) {
+    return c.boolean(value ? "true" : "false");
+  } else if constexpr (std::is_arithmetic_v<U>) {
+    return c.number(stringify_number(std::forward<T>(value), numeric_separator));
+  } else if constexpr (detail::is_specialization_v<U, std::complex>) {
+    return c.number(stringify_number(value.real()) + "+" + stringify_number(value.imag()) + "i");
+  } else {
+    static_assert([] { return false; }(), "Unsupported simple type for stringify_simple");
+  }
+}
+
 [[nodiscard]] auto stringify_node(const node::node &node, const inspect_options &options,
                                   size_t level, bool force_wrap, bool suppress_reference_pointer,
                                   size_t rest_line_length,
@@ -4115,7 +4158,7 @@ template <typename T>
       throw detail::maximum_depth_reached();
 
     if (new_options.colors != options.colors || new_options.styles != options.styles)
-      new_options.c = detail::build_c(new_options.colors, new_options.styles);
+      new_options.c = detail::c{new_options.colors, new_options.styles};
 
     return build_tree(std::forward<V>(v), new_options, refs);
   };
@@ -4125,14 +4168,9 @@ template <typename T>
     return build_tree(std::forward<V>(v), options, refs);
   };
 
-  if constexpr (std::is_enum_v<U>) {
-    return text(c.enumeration(std::string(enum_type_name_with_name(value))));
-  } else if constexpr (std::same_as<U, char> || std::same_as<U, signed char> ||
-                       std::same_as<U, unsigned char> || std::same_as<U, wchar_t> ||
-                       std::same_as<U, char8_t> || std::same_as<U, char16_t> ||
-                       std::same_as<U, char32_t>) {
-    return text(c.character(stringify_string(std::string(1, value), '\'')));
-  } else if constexpr (detail::string_type<U>) {
+  if constexpr (simple_type<T>) {
+    return text(stringify_simple(std::forward<T>(value), c, options.numeric_separator));
+  } else if constexpr (string_type<U>) {
     if constexpr (std::same_as<std::decay_t<T>, char *> ||
                   std::same_as<std::decay_t<T>, const char *> ||
                   std::same_as<std::decay_t<T>, signed char *> ||
@@ -4144,7 +4182,7 @@ template <typename T>
       if (!value)
         return text(c.null("nullptr"));
 
-    const std::string str = detail::extract_string_content(value);
+    const std::string str = extract_string_content(value);
 
     const bool is_truncated = str.size() > options.max_string_length;
     const std::string truncated_str = is_truncated ? str.substr(0, options.max_string_length) : str;
@@ -4175,15 +4213,6 @@ template <typename T>
     if (ellipsis != "")
       std::get<text_node>(*parts[parts.size() - 1]).value += ellipsis;
     return inline_wrap(inline_version(truncated_str, ellipsis), between(std::move(parts)));
-  } else if constexpr (std::same_as<U, std::filesystem::path>) {
-    return text("path(" + c.string(stringify_string(value.lexically_normal().string())) + ")");
-  } else if constexpr (std::same_as<U, bool>) {
-    return text(c.boolean(value ? "true" : "false"));
-  } else if constexpr (std::is_arithmetic_v<U>) {
-    return text(c.number(stringify_number(value, options.numeric_separator)));
-  } else if constexpr (detail::is_specialization_v<U, std::complex>) {
-    return text(
-        c.number(stringify_number(value.real()) + "+" + stringify_number(value.imag()) + "i"));
   } else if constexpr (std::same_as<U, std::any>) {
     if (!value.has_value())
       return text(c.null("{}"));
@@ -4728,22 +4757,35 @@ template <typename T>
 template <bool UseGlobalDefaultOptions = false, typename T, typename... Os>
   requires(std::is_base_of_v<detail::setting<typename Os::type, Os::tag>, Os> && ...)
 [[nodiscard]] auto inspect(T &&value, Os &&...options) -> std::string {
-  inspect_method_options build_tree_options;
-  if constexpr (UseGlobalDefaultOptions)
-    detail::patch_options_with_global_default_options(build_tree_options);
-  detail::patch_options(build_tree_options, std::forward<Os>(options)...);
-  build_tree_options.c = detail::build_c(build_tree_options.colors, build_tree_options.styles);
-  std::unordered_map<node::ref, std::size_t, node::ref_hash> refs;
+  if constexpr (detail::simple_type<T>) {
+    struct {
+      std::variant<bool, std::string_view> numeric_separator = false;
+      bool colors = false;
+      mp::styles styles;
+    } opts;
+    if constexpr (UseGlobalDefaultOptions)
+      detail::patch_options_with_global_default_options(opts);
+    detail::patch_options(opts, std::forward<Os>(options)...);
+    detail::c c = detail::c{opts.colors, opts.styles};
+    return detail::stringify_simple(std::forward<T>(value), c, opts.numeric_separator);
+  } else {
+    inspect_method_options build_tree_options;
+    if constexpr (UseGlobalDefaultOptions)
+      detail::patch_options_with_global_default_options(build_tree_options);
+    detail::patch_options(build_tree_options, std::forward<Os>(options)...);
+    build_tree_options.c = detail::c{build_tree_options.colors, build_tree_options.styles};
+    std::unordered_map<node::ref, std::size_t, node::ref_hash> refs;
 
-  const auto node = detail::build_tree(std::forward<T>(value), build_tree_options, refs);
+    const auto node = detail::build_tree(std::forward<T>(value), build_tree_options, refs);
 
-  inspect_options stringify_node_options;
-  if constexpr (UseGlobalDefaultOptions)
-    detail::patch_options_with_global_default_options(stringify_node_options);
-  detail::patch_options(stringify_node_options, std::forward<Os>(options)...);
+    inspect_options stringify_node_options;
+    if constexpr (UseGlobalDefaultOptions)
+      detail::patch_options_with_global_default_options(stringify_node_options);
+    detail::patch_options(stringify_node_options, std::forward<Os>(options)...);
 
-  return detail::stringify_node(*node, stringify_node_options, 0, false, false,
-                                stringify_node_options.break_length, refs);
+    return detail::stringify_node(*node, stringify_node_options, 0, false, false,
+                                  stringify_node_options.break_length, refs);
+  }
 }
 
 namespace detail {
