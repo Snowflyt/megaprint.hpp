@@ -4102,7 +4102,8 @@ auto stringify_number(T value, std::variant<bool, std::string_view> numeric_sepa
 // `mp::println(...)` is only used to print simple types.
 template <typename T>
 concept simple_type =
-    std::is_enum_v<std::remove_cvref_t<T>> || std::same_as<std::remove_cvref_t<T>, char> ||
+    std::is_null_pointer_v<std::remove_cvref_t<T>> || std::is_enum_v<std::remove_cvref_t<T>> ||
+    std::same_as<std::remove_cvref_t<T>, char> ||
     std::same_as<std::remove_cvref_t<T>, signed char> ||
     std::same_as<std::remove_cvref_t<T>, unsigned char> ||
     std::same_as<std::remove_cvref_t<T>, wchar_t> ||
@@ -4122,7 +4123,9 @@ template <simple_type T>
     -> std::string {
   using U = std::remove_cvref_t<T>;
 
-  if constexpr (std::is_enum_v<U>) {
+  if constexpr (std::is_null_pointer_v<U>) {
+    return c.null("nullptr");
+  } else if constexpr (std::is_enum_v<U>) {
     return c.enumeration(std::string(enum_type_name_with_name(std::forward<T>(value))));
   } else if constexpr (std::same_as<U, char> || std::same_as<U, signed char> ||
                        std::same_as<U, unsigned char> || std::same_as<U, wchar_t> ||
@@ -4248,12 +4251,13 @@ template <typename T>
     // Check some common types that std::any can hold
     // Listing more types is technically possible but will bloat the code size
     using possible_types =
-        std::tuple<char, signed char, unsigned char, wchar_t, char8_t, char16_t, char32_t,
-                   std::string, std::wstring, std::u8string, std::u16string, std::u32string,
-                   std::string_view, std::wstring_view, std::u8string_view, std::u16string_view,
-                   std::u32string_view, std::filesystem::path, bool, short, unsigned short, int,
-                   unsigned int, long, unsigned long, long long, unsigned long long,
-                   std::complex<float>, std::complex<double>, std::complex<long double>, std::any>;
+        std::tuple<std::nullptr_t, char, signed char, unsigned char, wchar_t, char8_t, char16_t,
+                   char32_t, std::string, std::wstring, std::u8string, std::u16string,
+                   std::u32string, std::string_view, std::wstring_view, std::u8string_view,
+                   std::u16string_view, std::u32string_view, std::filesystem::path, bool, short,
+                   unsigned short, int, unsigned int, long, unsigned long, long long,
+                   unsigned long long, std::complex<float>, std::complex<double>,
+                   std::complex<long double>, std::any>;
 
     const auto &type = value.type();
 
