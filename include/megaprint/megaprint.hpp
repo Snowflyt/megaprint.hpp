@@ -51,6 +51,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <ostream>
 #include <queue>
 #include <set>
 #include <sstream>
@@ -162,6 +163,21 @@ template <typename F>
 struct function_info<F> : function_info<decltype(&F::operator())> {
   static constexpr function_kind kind = function_kind::functor;
 };
+
+template <typename T>
+concept forbidden_ostream_pointer =
+    std::is_pointer_v<std::remove_cvref_t<T>> || (requires {
+      typename std::remove_cvref_t<T>::element_type;
+    } && (std::same_as<typename std::remove_cvref_t<T>::element_type, wchar_t> ||
+          std::same_as<typename std::remove_cvref_t<T>::element_type, char8_t> ||
+          std::same_as<typename std::remove_cvref_t<T>::element_type, char16_t> ||
+          std::same_as<typename std::remove_cvref_t<T>::element_type, char32_t>));
+
+template <typename T>
+concept has_ostream_op =
+    !(requires { function_info<std::remove_cvref_t<T>>::arity; }) &&
+    !forbidden_ostream_pointer<T> && !std::is_array_v<T> &&
+    requires(std::ostream &os, const std::remove_cvref_t<T> &value) { os << value; };
 
 // https://stackoverflow.com/a/28796458/21418758
 template <typename T, template <typename...> class Ref>
@@ -4095,7 +4111,10 @@ concept simple_type =
     std::same_as<std::remove_cvref_t<T>, char32_t> ||
     std::same_as<std::remove_cvref_t<T>, std::filesystem::path> ||
     std::same_as<std::remove_cvref_t<T>, bool> || std::is_arithmetic_v<std::remove_cvref_t<T>> ||
-    detail::is_specialization_v<std::remove_cvref_t<T>, std::complex>;
+    is_specialization_v<std::remove_cvref_t<T>, std::complex> ||
+    requires(const std::remove_cvref_t<T> &value) {
+      { value.inspect() } -> string_type;
+    };
 
 template <simple_type T>
 [[nodiscard]] inline auto stringify_simple(T &&value, const detail::c &c,
@@ -4119,8 +4138,12 @@ template <simple_type T>
     return c.boolean(value ? "true" : "false");
   } else if constexpr (std::is_arithmetic_v<U>) {
     return c.number(stringify_number(std::forward<T>(value), numeric_separator));
-  } else if constexpr (detail::is_specialization_v<U, std::complex>) {
+  } else if constexpr (is_specialization_v<U, std::complex>) {
     return c.number(stringify_number(value.real()) + "+" + stringify_number(value.imag()) + "i");
+  } else if constexpr (requires {
+                         { value.inspect() } -> string_type;
+                       }) {
+    return stringify_string(value.inspect());
   } else {
     static_assert([] { return false; }(), "Unsupported simple type for stringify_simple");
   }
@@ -4336,6 +4359,15 @@ template <typename T>
       return as_node(value.inspect(options));
     else
       return as_node(value.inspect());
+  } else if constexpr (has_ostream_op<U>) {
+    // NOTE: This branch is not included in simple_type concept because .inspect() takes precedence
+    // over operator<<, and I have no idea to define a concept for value.inspect(options, expand),
+    // since expand() is a lambda with template parameters.
+    // Hence, it seems we cannot eliminate binary size bloat for this case.
+    // If you know how to do it, please open an issue or PR.
+    std::ostringstream oss;
+    oss << value;
+    return text(oss.str());
   } else {
     constexpr auto type_name = detail::type_name<U>();
     const ref ref{std::string(type_name), reinterpret_cast<std::uintptr_t>(std::addressof(value))};

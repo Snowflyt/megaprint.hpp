@@ -206,7 +206,37 @@ Check the [examples/](examples/) directory for more examples of supported types.
 
 ### Custom User-Defined Types
 
-**megaprint** automatically uses the `.inspect()` method of user-defined types to provide a custom inspection output. The member function signature can be one of the following:
+**megaprint** already supports types with an `std::ostream` operator `<<`. Therefore, if your type already has an `operator<<` defined, you can use it directly with **megaprint** without any additional work. For example:
+
+```cpp
+class Date {
+public:
+  Date(size_t year, size_t month, size_t day) : year_(year), month_(month), day_(day) {}
+
+  friend std::ostream &operator<<(std::ostream &os, const Date &date) {
+    return os << date.year_ << '-' << std::setfill('0') << std::setw(2) << date.month_ << '-'
+              << std::setfill('0') << std::setw(2) << date.day_;
+  }
+
+private:
+  size_t year_;
+  size_t month_;
+  size_t day_;
+};
+
+int main() {
+  Date date(2025, 8, 2);
+  mp::println("Date:", date);
+  // Date: 2025-08-02
+  return 0;
+}
+```
+
+However, while this works well for many types, it may not be sufficient for all cases. For example, if you have a custom container type, it can be challenging to handle formatting and indentation correctly using only `operator<<`. In such cases, you can implement a custom `.inspect()` method for your type.
+
+**megaprint** automatically uses the `.inspect()` method of user-defined types to provide custom inspection output. If both `operator<<` and `.inspect()` are defined, the `.inspect()` method takes precedence over `operator<<`.
+
+The `.inspect()` member function can have one of the following signatures:
 
 ```cpp
 inspect(const mp::inspect_method_options& options, const auto &expand)

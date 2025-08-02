@@ -1,9 +1,31 @@
+#include <iostream>
 #include <string>
 #include <string_view>
 #include <type_traits>
 #include <utility>
 
 #include <megaprint/megaprint.hpp>
+
+class Date {
+public:
+  Date(size_t year, size_t month, size_t day) : year_(year), month_(month), day_(day) {}
+
+  friend auto operator<<(std::ostream &os, const Date &date) -> std::ostream & {
+    return os << date.year_ << '-' << std::setfill('0') << std::setw(2) << date.month_ << '-'
+              << std::setfill('0') << std::setw(2) << date.day_;
+  }
+
+  [[nodiscard]] auto inspect(const auto & /*options*/, const auto &expand) const {
+    using namespace mp::node;
+    return sequence(text("Date("), expand(year_), text(", "), expand(month_), text(", "),
+                    expand(day_), text(")"));
+  }
+
+private:
+  size_t year_;
+  size_t month_;
+  size_t day_;
+};
 
 template <typename T> class Box {
 public:
@@ -149,6 +171,10 @@ struct MyType {
 };
 
 auto main() -> int {
+  const Date date(2025, 8, 2);
+  std::cout << "Date: " << date << '\n';
+  mp::println("Date:", date);
+
   const Obj obj = {
       .point = Point{1, 2},
       .box1 = Box{Foo{.foo = "bar"}},
