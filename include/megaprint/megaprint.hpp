@@ -311,7 +311,8 @@ template <typename E> constexpr auto enum_name(E value) -> std::string_view {
 // Adapted from Boost.PFR: https://github.com/boostorg/pfr
 template <std::size_t Index> using size_t_ = std::integral_constant<std::size_t, Index>;
 
-template <typename T> consteval auto unsafe_declval() noexcept -> T {
+// Don't make it consteval, as older compilers (e.g., Clang 12) do not support it
+template <typename T> constexpr auto unsafe_declval() noexcept -> T {
   using func_ptr_t = T (*)();
   func_ptr_t ptr = nullptr;
   return ptr();
@@ -348,12 +349,14 @@ struct ubiq_rref_constructor {
 // Note that these take O(N) compile time and memory!
 template <typename T, std::size_t... I,
           typename /*Enable*/ = std::enable_if_t<std::is_copy_constructible_v<T>>>
-consteval auto enable_if_initializable_helper(std::index_sequence<I...>) noexcept
+// Don't make it consteval, as older compilers (e.g., Clang 12) do not support it
+constexpr auto enable_if_initializable_helper(std::index_sequence<I...>) noexcept
     -> std::add_pointer_t<decltype(T{ubiq_lref_constructor{I}...})>;
 
 template <typename T, std::size_t... I,
           typename /*Enable*/ = std::enable_if_t<!std::is_copy_constructible_v<T>>>
-consteval auto enable_if_initializable_helper(std::index_sequence<I...>) noexcept
+// Don't make it consteval, as older compilers (e.g., Clang 12) do not support it
+constexpr auto enable_if_initializable_helper(std::index_sequence<I...>) noexcept
     // FIXME: Until 2025.7, clang and MSVC seems to have issues with this when counting
     // structs with a `vector<unique_ptr<T>>` field. Strangely, the issue only showcases
     // for C++ >= 20, and for C++ 17, everything works fine.
