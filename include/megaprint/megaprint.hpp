@@ -3948,12 +3948,7 @@ concept string_type =
     std::same_as<std::decay_t<S>, std::wstring_view> ||
     std::same_as<std::decay_t<S>, std::u8string_view> ||
     std::same_as<std::decay_t<S>, std::u16string_view> ||
-    std::same_as<std::decay_t<S>, std::u32string_view> ||
-    std::same_as<std::decay_t<S>, std::pmr::string> ||
-    std::same_as<std::decay_t<S>, std::pmr::wstring> ||
-    std::same_as<std::decay_t<S>, std::pmr::u8string> ||
-    std::same_as<std::decay_t<S>, std::pmr::u16string> ||
-    std::same_as<std::decay_t<S>, std::pmr::u32string>;
+    std::same_as<std::decay_t<S>, std::u32string_view>;
 
 template <string_type S> [[nodiscard]] auto extract_string_content(S &&s) -> std::string {
   using T = std::decay_t<S>;
@@ -3991,13 +3986,11 @@ template <string_type S> [[nodiscard]] auto extract_string_content(S &&s) -> std
     return s ? utf32_to_utf8(std::u32string_view(s)) : "";
   }
   // UTF-8 native
-  else if constexpr (std::same_as<T, std::string> || std::same_as<T, std::string_view> ||
-                     std::same_as<T, std::pmr::string>) {
+  else if constexpr (std::same_as<T, std::string> || std::same_as<T, std::string_view>) {
     return std::string(std::forward<S>(s));
   }
   // wchar_t → UTF-8
-  else if constexpr (std::same_as<T, std::wstring> || std::same_as<T, std::wstring_view> ||
-                     std::same_as<T, std::pmr::wstring>) {
+  else if constexpr (std::same_as<T, std::wstring> || std::same_as<T, std::wstring_view>) {
     // Assume wchar_t is UTF-32 on Linux, UTF-16 on Windows
     if constexpr (sizeof(wchar_t) == 2)
       return utf16_to_utf8(
@@ -4007,18 +4000,15 @@ template <string_type S> [[nodiscard]] auto extract_string_content(S &&s) -> std
           std::u32string_view(reinterpret_cast<const char32_t *>(s.data()), s.size()));
   }
   // UTF-16 → UTF-8
-  else if constexpr (std::same_as<T, std::u16string> || std::same_as<T, std::u16string_view> ||
-                     std::same_as<T, std::pmr::u16string>) {
+  else if constexpr (std::same_as<T, std::u16string> || std::same_as<T, std::u16string_view>) {
     return utf16_to_utf8(std::u16string_view(s.data(), s.size()));
   }
   // UTF-32 → UTF-8
-  else if constexpr (std::same_as<T, std::u32string> || std::same_as<T, std::u32string_view> ||
-                     std::same_as<T, std::pmr::u32string>) {
+  else if constexpr (std::same_as<T, std::u32string> || std::same_as<T, std::u32string_view>) {
     return utf32_to_utf8(std::u32string_view(s.data(), s.size()));
   }
   // UTF-8 pmr
-  else if constexpr (std::same_as<T, std::u8string> || std::same_as<T, std::u8string_view> ||
-                     std::same_as<T, std::pmr::u8string>) {
+  else if constexpr (std::same_as<T, std::u8string> || std::same_as<T, std::u8string_view>) {
     return std::string(reinterpret_cast<const char *>(s.data()), s.size());
   } else {
     static_assert([] { return false; }(), "Unsupported string type");
@@ -4238,11 +4228,9 @@ template <typename T>
         std::tuple<char, signed char, unsigned char, wchar_t, char8_t, char16_t, char32_t,
                    std::string, std::wstring, std::u8string, std::u16string, std::u32string,
                    std::string_view, std::wstring_view, std::u8string_view, std::u16string_view,
-                   std::u32string_view, std::pmr::string, std::pmr::wstring, std::pmr::u8string,
-                   std::pmr::u16string, std::pmr::u32string, std::filesystem::path, bool, short,
-                   unsigned short, int, unsigned int, long, unsigned long, long long,
-                   unsigned long long, std::complex<float>, std::complex<double>,
-                   std::complex<long double>, std::any>;
+                   std::u32string_view, std::filesystem::path, bool, short, unsigned short, int,
+                   unsigned int, long, unsigned long, long long, unsigned long long,
+                   std::complex<float>, std::complex<double>, std::complex<long double>, std::any>;
 
     const auto &type = value.type();
 

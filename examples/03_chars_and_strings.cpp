@@ -38,8 +38,5 @@ auto main() -> int {
   std::string_view str_view = "String view example";
   mp::println("string_view:", mp::inspect(str_view, mp::option::colors{true}));
 
-  std::pmr::string pmr_str = "PMR string example";
-  mp::println("PMR string:", mp::inspect(pmr_str, mp::option::colors{true}));
-
   return 0;
 }
