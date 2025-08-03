@@ -13,15 +13,15 @@ if(MSVC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4")
   endif()
 elseif(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}
-    -Wall -Wno-long-long -Wpedantic -Wsign-conversion
-    -Wshadow -Wconversion -Werror -Wextra")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-long-long -Wpedantic -Wsign-conversion -Wshadow -Wconversion -Werror -Wextra")
 endif()
 
-# Enable ASan to detect memory errors on *nix
+# Enable ASan to detect memory errors on *nix (except macOS + GCC)
 if(CMAKE_BUILD_TYPE MATCHES Debug AND UNIX)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer")
-  set(CMAKE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS} -fsanitize=address")
+  if(NOT (APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU"))
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer")
+    set(CMAKE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS} -fsanitize=address")
+  endif()
 endif()
 
 # Disable secure warnings on Windows

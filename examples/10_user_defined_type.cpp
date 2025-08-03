@@ -104,7 +104,7 @@ public:
     return sequence(text(options.c.blue(tag_)), text("("),
                     expand(value_,
                            // Reset `level` and force expansion the object with a depth of 1
-                           mp::option::level{0}, mp::option::depth{1},
+                           mp::option::level{0U}, mp::option::depth{1U},
                            // Omit the `value` field when expanding the object
                            mp::option::omitted_fields{std::unordered_set<std::string>{"value"}},
                            // Avoid auto-adding current value to `ancestors` to avoid circulars

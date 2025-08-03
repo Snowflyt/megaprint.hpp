@@ -12,6 +12,7 @@ auto main() -> int {
   Person person = {
       .name = "Edgar Allan Poe",
       .birth_year = 1809,
+      .self = nullptr, // Will be set later
   };
   person.self = &person; // self-reference
 

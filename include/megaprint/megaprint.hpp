@@ -260,8 +260,11 @@ template <typename E> constexpr auto enum_type_name_with_name(E value) -> std::s
   if (auto idx = enum_index(value)) {
     constexpr std::size_t N = ENUM_RANGE_MAX - ENUM_RANGE_MIN + 1;
     constexpr auto names = []<std::size_t... I>(std::index_sequence<I...> /*indices*/) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wconversion"
       return std::array<std::string_view, sizeof...(I)>{
           (enum_type_name_with_name<E, static_cast<E>(ENUM_RANGE_MIN + static_cast<int>(I))>())...};
+#pragma GCC diagnostic pop
     }(std::make_index_sequence<N>{});
     return names[*idx];
   }
@@ -3325,9 +3328,9 @@ namespace node {
 using ref = std::pair<std::string, std::uintptr_t>;
 
 struct ref_hash {
-  [[nodiscard]] auto operator()(const ref &ref) const noexcept -> std::size_t {
-    const std::size_t h1 = std::hash<std::string>{}(ref.first);
-    const std::size_t h2 = std::hash<std::uintptr_t>{}(ref.second);
+  [[nodiscard]] auto operator()(const ref &r) const noexcept -> std::size_t {
+    const std::size_t h1 = std::hash<std::string>{}(r.first);
+    const std::size_t h2 = std::hash<std::uintptr_t>{}(r.second);
     return h1 ^ (h2 << 1);
   }
 };
@@ -3412,39 +3415,38 @@ template <typename... Ns>
   });
 }
 
-[[nodiscard]] inline auto clone_node(const mp::node::node &node)
-    -> std::unique_ptr<mp::node::node> {
+[[nodiscard]] inline auto clone_node(const mp::node::node &n) -> std::unique_ptr<mp::node::node> {
   return std::visit(
-      [](auto &&node) -> std::unique_ptr<mp::node::node> {
-        using V = std::decay_t<decltype(node)>;
+      [](auto &&inner_node) -> std::unique_ptr<mp::node::node> {
+        using V = std::decay_t<decltype(inner_node)>;
         if constexpr (std::same_as<V, mp::node::text_node> ||
                       std::same_as<V, mp::node::circular_node>) {
-          return std::make_unique<mp::node::node>(node);
+          return std::make_unique<mp::node::node>(inner_node);
         } else if constexpr (std::same_as<V, mp::node::inline_wrap_node>) {
           return std::make_unique<mp::node::node>(
-              mp::node::inline_wrap_node{.inline_node = clone_node(*node.inline_node),
-                                         .wrap_node = clone_node(*node.wrap_node),
-                                         .ref = node.ref});
+              mp::node::inline_wrap_node{.inline_node = clone_node(*inner_node.inline_node),
+                                         .wrap_node = clone_node(*inner_node.wrap_node),
+                                         .ref = inner_node.ref});
         } else if constexpr (std::same_as<V, mp::node::sequence_node>) {
           std::vector<std::unique_ptr<mp::node::node>> values;
-          values.reserve(node.values.size());
-          for (auto &value : node.values)
+          values.reserve(inner_node.values.size());
+          for (auto &value : inner_node.values)
             values.push_back(clone_node(*value));
           return std::make_unique<mp::node::node>(
-              mp::node::sequence_node{std::move(values), node.ref});
+              mp::node::sequence_node{std::move(values), inner_node.ref});
         } else {
           std::vector<std::unique_ptr<mp::node::node>> values;
-          values.reserve(node.values.size());
-          for (auto &value : node.values)
+          values.reserve(inner_node.values.size());
+          for (auto &value : inner_node.values)
             values.push_back(clone_node(*value));
-          return std::make_unique<mp::node::node>(
-              mp::node::between_node{.values = std::move(values),
-                                     .open = node.open ? clone_node(*node.open) : nullptr,
-                                     .close = node.close ? clone_node(*node.close) : nullptr,
-                                     .ref = node.ref});
+          return std::make_unique<mp::node::node>(mp::node::between_node{
+              .values = std::move(values),
+              .open = inner_node.open ? clone_node(*inner_node.open) : nullptr,
+              .close = inner_node.close ? clone_node(*inner_node.close) : nullptr,
+              .ref = inner_node.ref});
         }
       },
-      node);
+      n);
 }
 
 } // namespace node
@@ -3488,9 +3490,8 @@ struct n {
     return mp::node::between(std::move(values), std::move(open), std::move(close));
   }
 
-  [[nodiscard]] static auto clone_node(const mp::node::node &node)
-      -> std::unique_ptr<mp::node::node> {
-    return mp::node::clone_node(node);
+  [[nodiscard]] static auto clone_node(const mp::node::node &n) -> std::unique_ptr<mp::node::node> {
+    return mp::node::clone_node(n);
   }
 };
 
@@ -3535,23 +3536,25 @@ template <typename T, option_tag Tag> struct setting {
 template <typename T, typename... Os>
   requires(std::is_base_of_v<setting<typename Os::type, Os::tag>, Os> && ...)
 inline void patch_options(T &options, Os &&...opts) {
-  constexpr std::size_t fields_count = count_fields<T>();
-  const auto fields = tie_as_tuple(options, size_t_<fields_count>{});
+  if constexpr (sizeof...(Os) > 0) {
+    constexpr std::size_t fields_count = count_fields<T>();
+    const auto fields = tie_as_tuple(options, size_t_<fields_count>{});
 
-  // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
-  auto set_option = [&fields]<typename O>(O &&opt) {
-    auto try_set_field = [&fields,
-                          &opt]<std::size_t I>(std::integral_constant<std::size_t, I> /*index*/) {
-      if constexpr (field_name<T, I>() == enum_name<option_tag, O::tag>())
-        sequence_tuple::get<I>(fields) = opt.value;
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+    auto set_option = [&fields]<typename O>(O &&opt) {
+      auto try_set_field = [&fields,
+                            &opt]<std::size_t I>(std::integral_constant<std::size_t, I> /*index*/) {
+        if constexpr (field_name<T, I>() == enum_name<option_tag, O::tag>())
+          sequence_tuple::get<I>(fields) = opt.value;
+      };
+
+      [&try_set_field]<std::size_t... I>(std::index_sequence<I...>) {
+        (try_set_field(std::integral_constant<std::size_t, I>{}), ...);
+      }(std::make_index_sequence<fields_count>{});
     };
 
-    [&try_set_field]<std::size_t... I>(std::index_sequence<I...>) {
-      (try_set_field(std::integral_constant<std::size_t, I>{}), ...);
-    }(std::make_index_sequence<fields_count>{});
-  };
-
-  (set_option(std::forward<Os>(opts)), ...);
+    (set_option(std::forward<Os>(opts)), ...);
+  }
 }
 
 } // namespace detail
@@ -3678,8 +3681,8 @@ namespace detail {
     };
 
     set(option::colors{supports_ansi()});
-    set(option::indent{2});
-    set(option::depth{4});
+    set(option::indent{std::size_t{2}});
+    set(option::depth{std::size_t{4}});
 
     return opts;
   }();
@@ -3709,12 +3712,14 @@ template <typename T> inline void patch_options_with_global_default_options(T &o
 template <typename... Os>
   requires(std::is_base_of_v<detail::setting<typename Os::type, Os::tag>, Os> && ...)
 inline void set_options(Os &&...options) {
-  auto &map = detail::default_options();
-  // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
-  auto set_option = [&map]<typename O>(O &&option) {
-    map[std::string(detail::enum_name<detail::option_tag, O::tag>())] = option.value;
-  };
-  (set_option(std::forward<Os>(options)), ...);
+  if constexpr (sizeof...(Os) > 0) {
+    auto &map = detail::default_options();
+    // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
+    auto set_option = [&map]<typename O>(O &&option) {
+      map[std::string(detail::enum_name<detail::option_tag, O::tag>())] = option.value;
+    };
+    (set_option(std::forward<Os>(options)), ...);
+  }
 }
 
 struct inspect_options {
@@ -3955,7 +3960,11 @@ template <string_type S> [[nodiscard]] auto extract_string_content(S &&s) -> std
                 std::same_as<T, const signed char *> || std::same_as<T, signed char *> ||
                 std::same_as<T, const unsigned char *> || std::same_as<T, unsigned char *> ||
                 std::same_as<T, const char8_t *> || std::same_as<T, char8_t *>) {
-    return s ? std::string(reinterpret_cast<const char *>(s)) : "";
+    if constexpr (std::is_pointer_v<std::remove_cvref_t<S>>)
+      return s ? std::string(reinterpret_cast<const char *>(s)) : "";
+    else
+      // No need to check nullptr for char arrays
+      return std::string(s);
   }
   // wchar_t* → UTF-8
   else if constexpr (std::same_as<T, const wchar_t *> || std::same_as<T, wchar_t *>) {
@@ -4107,7 +4116,10 @@ template <simple_type T>
                        std::same_as<U, unsigned char> || std::same_as<U, wchar_t> ||
                        std::same_as<U, char8_t> || std::same_as<U, char16_t> ||
                        std::same_as<U, char32_t>) {
-    return c.character(stringify_string(std::string(1, std::forward<T>(value)), '\''));
+    std::string s;
+    auto ch = std::forward<T>(value);
+    s.assign(reinterpret_cast<const char *>(&ch), sizeof(ch));
+    return c.character(stringify_string(s, '\''));
   } else if constexpr (std::same_as<U, std::filesystem::path>) {
     return "path(" + c.string(stringify_string(value.lexically_normal().string())) + ")";
   } else if constexpr (std::same_as<U, bool>) {
@@ -4186,18 +4198,18 @@ template <typename T>
 
     const bool is_truncated = str.size() > options.max_string_length;
     const std::string truncated_str = is_truncated ? str.substr(0, options.max_string_length) : str;
-    const std::string ellipsis =
+    const std::string ellipsis_str =
         is_truncated
             ? ("... " + std::to_string(str.size() - options.max_string_length) + " more character" +
                ((str.size() - options.max_string_length == 1) ? "" : "s"))
             : "";
 
-    auto inline_version = [&c](std::string_view value, std::string_view ellipsis = "") {
-      return text(c.string(stringify_string(std::string(value))) + std::string(ellipsis));
+    auto inline_version = [&c](std::string_view v, std::string_view ellipsis = "") {
+      return text(c.string(stringify_string(std::string(v))) + std::string(ellipsis));
     };
 
     if (truncated_str.find('\n') == std::string::npos)
-      return inline_version(truncated_str, ellipsis);
+      return inline_version(truncated_str, ellipsis_str);
 
     std::string rest = truncated_str;
     std::vector<std::unique_ptr<mp::node::node>> parts;
@@ -4210,9 +4222,9 @@ template <typename T>
       parts.push_back(inline_version(rest));
     for (std::size_t i = 0; i < parts.size() - 1; i++)
       std::get<text_node>(*parts[i]).value += " +";
-    if (ellipsis != "")
-      std::get<text_node>(*parts[parts.size() - 1]).value += ellipsis;
-    return inline_wrap(inline_version(truncated_str, ellipsis), between(std::move(parts)));
+    if (ellipsis_str != "")
+      std::get<text_node>(*parts[parts.size() - 1]).value += ellipsis_str;
+    return inline_wrap(inline_version(truncated_str, ellipsis_str), between(std::move(parts)));
   } else if constexpr (std::same_as<U, std::any>) {
     if (!value.has_value())
       return text(c.null("{}"));
@@ -4316,12 +4328,12 @@ template <typename T>
       requires { value.inspect(options, expand); } || requires { value.inspect(options); } ||
       requires { value.inspect(); }) {
     auto as_node = [&c, &inplace_expand](auto &&res) -> std::unique_ptr<mp::node::node> {
-      using U = std::decay_t<decltype(res)>;
-      if constexpr (std::same_as<U, char *> || std::same_as<U, const char *>)
+      using V = std::decay_t<decltype(res)>;
+      if constexpr (std::same_as<V, char *> || std::same_as<V, const char *>)
         return text(res ? detail::extract_string_content(res) : c.null("nullptr"));
-      if constexpr (string_type<U>)
+      if constexpr (string_type<V>)
         return text(detail::extract_string_content(res));
-      else if constexpr (std::same_as<U, std::unique_ptr<mp::node::node>>)
+      else if constexpr (std::same_as<V, std::unique_ptr<mp::node::node>>)
         return std::forward<decltype(res)>(res);
       else
         return inplace_expand(res);
@@ -4361,7 +4373,7 @@ template <typename T>
         if constexpr (std::is_array_v<U>)
           size = std::extent_v<U>;
         else if constexpr (detail::is_specialization_v<U, std::forward_list>)
-          size = std::distance(value.begin(), value.end());
+          size = static_cast<std::size_t>(std::distance(value.begin(), value.end()));
         else
           size = value.size();
 
@@ -4469,8 +4481,8 @@ template <typename T>
                          detail::is_specialization_v<U, std::unordered_multimap> ||
                          detail::is_specialization_v<U, std::multimap>) {
         entries.reserve(value.size());
-        for (const auto &[key, value] : value)
-          entries.push_back(sequence(expand(key), text(" => "), expand(value)));
+        for (const auto &[key, v] : value)
+          entries.push_back(sequence(expand(key), text(" => "), expand(v)));
 
         if constexpr (detail::is_specialization_v<U, std::unordered_map>)
           prefix = text("unordered_map(" + std::to_string(value.size()) + ") ");
@@ -4625,7 +4637,7 @@ template <typename T>
 }
 
 [[nodiscard]] auto inline stringify_node(
-    const node::node &node, const inspect_options &options, size_t level, bool force_wrap,
+    const node::node &n, const inspect_options &options, size_t level, bool force_wrap,
     bool suppress_reference_pointer, size_t rest_line_length,
     std::unordered_map<node::ref, std::size_t, node::ref_hash> &refs) -> std::string {
   using namespace node;
@@ -4695,7 +4707,7 @@ template <typename T>
             if (options.reference_pointer && is_pointer &&
                 !std::holds_alternative<circular_node>(*node.values[1]))
               if (const auto it =
-                      refs.find(std::visit([](auto &&node) { return node.ref; }, *node.values[1]));
+                      refs.find(std::visit([](auto &&nd) { return nd.ref; }, *node.values[1]));
                   it != refs.end()) {
                 const std::string str = "<ref *" + std::to_string(it->second) + ">";
                 res = (options.colors ? detail::colorize(str, options.styles.special) : str) + " " +
@@ -4749,7 +4761,7 @@ template <typename T>
           return res;
         }
       },
-      node);
+      n);
 }
 
 } // namespace detail

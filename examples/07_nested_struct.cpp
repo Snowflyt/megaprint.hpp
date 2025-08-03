@@ -37,6 +37,7 @@ auto main() -> int {
           .zip = 2116,
       }},
       .friends = {"John", "Jane", "Alice"},
+      .self = nullptr, // Will be set later
   };
   person.self = &person; // self-reference
 
