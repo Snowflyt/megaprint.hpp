@@ -1,6 +1,7 @@
 #include <deque>
 #include <forward_list>
 #include <list>
+#include <span>
 #include <vector>
 
 #include <megaprint/megaprint.hpp>
@@ -8,6 +9,7 @@
 auto main() -> int {
   std::vector<int> vec{1, 2, 3, 4};
   mp::println("vector:", vec);
+  mp::println("vector span:", std::span<int>{vec});
 
   std::list<int> lst{1, 2, 3, 4};
   mp::println("list:", lst);

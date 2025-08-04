@@ -60,6 +60,7 @@
 #include <ostream>
 #include <queue>
 #include <set>
+#include <span>
 #include <sstream>
 #include <stack>
 #include <stdexcept>
@@ -71,6 +72,7 @@
 #include <typeinfo>
 #include <unordered_map>
 #include <unordered_set>
+#include <valarray>
 #include <variant>
 #include <version>
 
@@ -204,6 +206,10 @@ inline constexpr bool is_specialization_v = is_specialization<T, Ref>::value;
 template <typename T> struct is_std_array : std::false_type {};
 template <typename T, std::size_t N> struct is_std_array<std::array<T, N>> : std::true_type {};
 template <typename T> inline constexpr bool is_std_array_v = is_std_array<T>::value;
+
+template <typename T> struct is_span : std::false_type {};
+template <typename T, std::size_t N> struct is_span<std::span<T, N>> : std::true_type {};
+template <typename T> inline constexpr bool is_span_v = is_span<std::remove_cvref_t<T>>::value;
 
 template <typename T> struct is_bitset : std::false_type {};
 template <std::size_t N> struct is_bitset<std::bitset<N>> : std::true_type {};
@@ -4690,12 +4696,11 @@ template <typename T>
       std::optional<std::unique_ptr<mp::node::node>> prefix;
 
       std::vector<std::unique_ptr<mp::node::node>> entries;
-      // C-array/array/vector/list/deque
-      if constexpr (std::is_array_v<U> || detail::is_std_array_v<U> ||
-                    detail::is_specialization_v<U, std::vector> ||
-                    detail::is_specialization_v<U, std::list> ||
-                    detail::is_specialization_v<U, std::forward_list> ||
-                    detail::is_specialization_v<U, std::deque>) {
+      // C-array/array/span/vector/list/deque
+      if constexpr (std::is_array_v<U> || is_std_array_v<U> || is_span_v<U> ||
+                    is_specialization_v<U, std::vector> || is_specialization_v<U, std::list> ||
+                    is_specialization_v<U, std::forward_list> ||
+                    is_specialization_v<U, std::deque>) {
         std::size_t size;
         if constexpr (std::is_array_v<U>)
           size = std::extent_v<U>;
@@ -4720,13 +4725,13 @@ template <typename T>
         open = "[";
         close = "]";
 
-        if constexpr (std::is_array_v<U> || detail::is_std_array_v<U>)
+        if constexpr (std::is_array_v<U> || is_std_array_v<U> || is_span_v<U>)
           prefix = text("<" + std::to_string(size) + ">");
-        else if constexpr (detail::is_specialization_v<U, std::list>)
+        else if constexpr (is_specialization_v<U, std::list>)
           prefix = text("list(" + std::to_string(size) + ") ");
-        else if constexpr (detail::is_specialization_v<U, std::forward_list>)
+        else if constexpr (is_specialization_v<U, std::forward_list>)
           prefix = text("forward_list(" + std::to_string(size) + ") ");
-        else if constexpr (detail::is_specialization_v<U, std::deque>)
+        else if constexpr (is_specialization_v<U, std::deque>)
           prefix = text("deque(" + std::to_string(size) + ") ");
       }
       // stack
