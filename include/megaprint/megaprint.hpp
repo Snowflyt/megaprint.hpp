@@ -35,6 +35,8 @@
 #include <array>
 #include <cctype>
 #include <charconv>
+#include <chrono>
+#include <compare>
 #include <complex>
 #include <cstddef>
 #include <cstdint>
@@ -3217,15 +3219,14 @@ enum class color : std::uint8_t {
 };
 
 struct styles {
-  // NOLINTBEGIN(misc-non-private-member-variables-in-classes)
   color string = color::green;
   color character = color::green;
   color number = color::yellow;
   color boolean = color::yellow;
   color enumeration = color::cyan;
   color null = color::bold;
+  color time = color::magenta;
   color special = color::cyan;
-  // NOLINTEND(misc-non-private-member-variables-in-classes)
 
   [[nodiscard]] auto operator==(const styles &other) const -> bool = default;
   [[nodiscard]] auto operator!=(const styles &other) const -> bool { return !(*this == other); }
@@ -3330,6 +3331,9 @@ public:
   }
   [[nodiscard]] auto null(std::string_view s) const -> std::string {
     return enabled_ ? colorize(s, styles_.null) : std::string(s);
+  }
+  [[nodiscard]] auto time(std::string_view s) const -> std::string {
+    return enabled_ ? colorize(s, styles_.time) : std::string(s);
   }
   [[nodiscard]] auto special(std::string_view s) const -> std::string {
     return enabled_ ? colorize(s, styles_.special) : std::string(s);
@@ -4113,6 +4117,44 @@ concept simple_type =
     std::same_as<std::remove_cvref_t<T>, std::filesystem::path> ||
     std::same_as<std::remove_cvref_t<T>, bool> || std::is_arithmetic_v<std::remove_cvref_t<T>> ||
     is_specialization_v<std::remove_cvref_t<T>, std::complex> ||
+    std::same_as<std::remove_cvref_t<T>, std::chrono::time_point<std::chrono::system_clock>> ||
+    std::same_as<std::remove_cvref_t<T>, std::chrono::time_point<std::chrono::steady_clock>> ||
+    std::same_as<std::remove_cvref_t<T>,
+                 std::chrono::time_point<std::chrono::high_resolution_clock>> ||
+#if __cpp_lib_chrono >= 201907L
+    std::same_as<std::remove_cvref_t<T>, std::chrono::time_point<std::chrono::utc_clock>> ||
+    std::same_as<std::remove_cvref_t<T>, std::chrono::time_point<std::chrono::tai_clock>> ||
+    std::same_as<std::remove_cvref_t<T>, std::chrono::time_point<std::chrono::gps_clock>> ||
+    std::same_as<std::remove_cvref_t<T>, std::chrono::time_point<std::chrono::file_clock>> ||
+    is_specialization_v<std::remove_cvref_t<T>, std::chrono::zoned_time> ||
+    std::same_as<std::remove_cvref_t<T>, std::chrono::years> ||
+    std::same_as<std::remove_cvref_t<T>, std::chrono::months> ||
+    std::same_as<std::remove_cvref_t<T>, std::chrono::weeks> ||
+    std::same_as<std::remove_cvref_t<T>, std::chrono::days> ||
+#endif
+    std::same_as<std::remove_cvref_t<T>, std::chrono::hours> ||
+    std::same_as<std::remove_cvref_t<T>, std::chrono::minutes> ||
+    std::same_as<std::remove_cvref_t<T>, std::chrono::seconds> ||
+    std::same_as<std::remove_cvref_t<T>, std::chrono::milliseconds> ||
+    std::same_as<std::remove_cvref_t<T>, std::chrono::microseconds> ||
+    std::same_as<std::remove_cvref_t<T>, std::chrono::nanoseconds> ||
+#if __cpp_lib_chrono >= 201907L
+    std::same_as<std::remove_cvref_t<T>, std::chrono::year> ||
+    std::same_as<std::remove_cvref_t<T>, std::chrono::month> ||
+    std::same_as<std::remove_cvref_t<T>, std::chrono::day> ||
+    std::same_as<std::remove_cvref_t<T>, std::chrono::weekday> ||
+    std::same_as<std::remove_cvref_t<T>, std::chrono::weekday_indexed> ||
+    std::same_as<std::remove_cvref_t<T>, std::chrono::weekday_last> ||
+    std::same_as<std::remove_cvref_t<T>, std::chrono::month_day> ||
+    std::same_as<std::remove_cvref_t<T>, std::chrono::month_day_last> ||
+    std::same_as<std::remove_cvref_t<T>, std::chrono::month_weekday> ||
+    std::same_as<std::remove_cvref_t<T>, std::chrono::month_weekday_last> ||
+    std::same_as<std::remove_cvref_t<T>, std::chrono::year_month> ||
+    std::same_as<std::remove_cvref_t<T>, std::chrono::year_month_day> ||
+    std::same_as<std::remove_cvref_t<T>, std::chrono::year_month_day_last> ||
+    std::same_as<std::remove_cvref_t<T>, std::chrono::year_month_weekday> ||
+    std::same_as<std::remove_cvref_t<T>, std::chrono::year_month_weekday_last> ||
+#endif
     requires(const std::remove_cvref_t<T> &value) {
       { value.inspect() } -> string_type;
     };
@@ -4143,6 +4185,140 @@ template <simple_type T>
     return c.number(stringify_number(std::forward<T>(value), numeric_separator));
   } else if constexpr (is_specialization_v<U, std::complex>) {
     return c.number(stringify_number(value.real()) + "+" + stringify_number(value.imag()) + "i");
+  } else if constexpr (std::same_as<U, std::chrono::time_point<std::chrono::system_clock>>
+#if __cpp_lib_chrono >= 201907L
+                       || std::same_as<U, std::chrono::time_point<std::chrono::utc_clock>> ||
+                       std::same_as<U, std::chrono::time_point<std::chrono::tai_clock>> ||
+                       std::same_as<U, std::chrono::time_point<std::chrono::gps_clock>> ||
+                       std::same_as<U, std::chrono::time_point<std::chrono::file_clock>> ||
+                       is_specialization_v<U, std::chrono::zoned_time> ||
+                       std::same_as<U, std::chrono::year> || std::same_as<U, std::chrono::month> ||
+                       std::same_as<U, std::chrono::day> || std::same_as<U, std::chrono::weekday> ||
+                       std::same_as<U, std::chrono::weekday_indexed> ||
+                       std::same_as<U, std::chrono::weekday_last> ||
+                       std::same_as<U, std::chrono::month_day> ||
+                       std::same_as<U, std::chrono::month_day_last> ||
+                       std::same_as<U, std::chrono::month_weekday> ||
+                       std::same_as<U, std::chrono::month_weekday_last> ||
+                       std::same_as<U, std::chrono::year_month> ||
+                       std::same_as<U, std::chrono::year_month_day> ||
+                       std::same_as<U, std::chrono::year_month_day_last> ||
+                       std::same_as<U, std::chrono::year_month_weekday> ||
+                       std::same_as<U, std::chrono::year_month_weekday_last>
+#endif
+  ) {
+    if constexpr (requires(std::ostream &os, const U &v) { os << v; }) {
+      // If the type has an overloaded operator<<, use it
+      std::ostringstream oss;
+      oss << value;
+      return c.time(oss.str());
+    } else {
+      // Older compilers may not support operator<< for chrono types,
+      // so we stringify the time point's duration since epoch.
+      // Note that the value must be time_point<system_clock> here,
+      // since when __cpp_lib_chrono >= 201907L, it should be guaranteed
+      // that the time_point supports operator<<.
+      using namespace std::chrono;
+
+      auto is_leap = [](std::size_t year) -> bool {
+        return (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
+      };
+
+      static constexpr std::array<std::size_t, 12> days_in_month = {31, 28, 31, 30, 31, 30,
+                                                                    31, 31, 30, 31, 30, 31};
+
+      // Total days since epoch
+      std::size_t days_since_epoch = duration_cast<days>(value.time_since_epoch()).count();
+      std::size_t year = 1970;
+
+      // Calculate year
+      while (true) {
+        std::size_t days_in_year = is_leap(year) ? 366 : 365;
+        if (days_since_epoch >= days_in_year) {
+          days_since_epoch -= days_in_year;
+          year++;
+        } else {
+          break;
+        }
+      }
+
+      // Calculate month
+      std::size_t month = 0;
+      while (true) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
+        std::size_t dim = days_in_month[month];
+        if (month == 1 && is_leap(year))
+          dim++; // Feb in leap year
+        if (days_since_epoch >= dim) {
+          days_since_epoch -= dim;
+          month++;
+        } else {
+          break;
+        }
+      }
+
+      std::size_t day = days_since_epoch + 1; // 1-based day
+
+      // Calculate time of day
+      const auto time = value.time_since_epoch() - duration_cast<days>(value.time_since_epoch());
+      const auto h = duration_cast<hours>(time);
+      const auto m = duration_cast<minutes>(time - h);
+      const auto s = duration_cast<seconds>(time - h - m);
+      const auto ns = duration_cast<nanoseconds>(time - h - m - s);
+
+      std::ostringstream oss;
+      oss << year << '-' << std::setfill('0') << std::setw(2) << (month + 1) << '-'
+          << std::setfill('0') << std::setw(2) << day << ' ' << std::setfill('0') << std::setw(2)
+          << h.count() << ':' << std::setfill('0') << std::setw(2) << m.count() << ':'
+          << std::setfill('0') << std::setw(2) << s.count() << '.' << std::setfill('0')
+          << std::setw(9) << ns.count();
+
+      // Remove trailing zeroes in nanoseconds
+      std::string str = oss.str();
+      str.erase(str.find_last_not_of('0') + 1, std::string::npos);
+      // If the last character is a dot, remove it
+      if (!str.empty() && str.back() == '.')
+        str.pop_back();
+
+      return c.time(str);
+    }
+  } else if constexpr (std::same_as<U, std::chrono::time_point<std::chrono::steady_clock>> ||
+                       std::same_as<U,
+                                    std::chrono::time_point<std::chrono::high_resolution_clock>>) {
+    return stringify_simple(value.time_since_epoch(), c, numeric_separator);
+  } else if constexpr (
+#if __cpp_lib_chrono >= 201907L
+      std::same_as<U, std::chrono::years> || std::same_as<U, std::chrono::months> ||
+      std::same_as<U, std::chrono::weeks> || std::same_as<U, std::chrono::days> ||
+#endif
+      std::same_as<U, std::chrono::hours> || std::same_as<U, std::chrono::minutes> ||
+      std::same_as<U, std::chrono::seconds> || std::same_as<U, std::chrono::milliseconds> ||
+      std::same_as<U, std::chrono::microseconds> || std::same_as<U, std::chrono::nanoseconds>) {
+    std::string unit;
+#if __cpp_lib_chrono >= 201907L
+    if constexpr (std::same_as<U, std::chrono::years>)
+      unit = "y";
+    else if constexpr (std::same_as<U, std::chrono::months>)
+      unit = "m";
+    else if constexpr (std::same_as<U, std::chrono::weeks>)
+      unit = "w";
+    else if constexpr (std::same_as<U, std::chrono::days>)
+      unit = "d";
+    else
+#endif
+        if constexpr (std::same_as<U, std::chrono::hours>)
+      unit = "h";
+    else if constexpr (std::same_as<U, std::chrono::minutes>)
+      unit = "min";
+    else if constexpr (std::same_as<U, std::chrono::seconds>)
+      unit = "s";
+    else if constexpr (std::same_as<U, std::chrono::milliseconds>)
+      unit = "ms";
+    else if constexpr (std::same_as<U, std::chrono::microseconds>)
+      unit = "μs";
+    else if constexpr (std::same_as<U, std::chrono::nanoseconds>)
+      unit = "ns";
+    return c.time(stringify_number(value.count(), numeric_separator) + unit);
   } else if constexpr (requires {
                          { value.inspect() } -> string_type;
                        }) {
@@ -4202,14 +4378,14 @@ template <typename T>
   if constexpr (simple_type<T>) {
     return text(stringify_simple(std::forward<T>(value), c, options.numeric_separator));
   } else if constexpr (string_type<U>) {
-    if constexpr (std::same_as<std::decay_t<T>, char *> ||
-                  std::same_as<std::decay_t<T>, const char *> ||
-                  std::same_as<std::decay_t<T>, signed char *> ||
-                  std::same_as<std::decay_t<T>, unsigned char *> ||
-                  std::same_as<std::decay_t<T>, wchar_t *> ||
-                  std::same_as<std::decay_t<T>, char8_t *> ||
-                  std::same_as<std::decay_t<T>, char16_t *> ||
-                  std::same_as<std::decay_t<T>, char32_t *>)
+    if constexpr (std::same_as<std::remove_cvref_t<T>, char *> ||
+                  std::same_as<std::remove_cvref_t<T>, const char *> ||
+                  std::same_as<std::remove_cvref_t<T>, signed char *> ||
+                  std::same_as<std::remove_cvref_t<T>, unsigned char *> ||
+                  std::same_as<std::remove_cvref_t<T>, wchar_t *> ||
+                  std::same_as<std::remove_cvref_t<T>, char8_t *> ||
+                  std::same_as<std::remove_cvref_t<T>, char16_t *> ||
+                  std::same_as<std::remove_cvref_t<T>, char32_t *>)
       if (!value)
         return text(c.null("nullptr"));
 
@@ -4250,14 +4426,36 @@ template <typename T>
 
     // Check some common types that std::any can hold
     // Listing more types is technically possible but will bloat the code size
-    using possible_types =
-        std::tuple<std::nullptr_t, char, signed char, unsigned char, wchar_t, char8_t, char16_t,
-                   char32_t, std::string, std::wstring, std::u8string, std::u16string,
-                   std::u32string, std::string_view, std::wstring_view, std::u8string_view,
-                   std::u16string_view, std::u32string_view, std::filesystem::path, bool, short,
-                   unsigned short, int, unsigned int, long, unsigned long, long long,
-                   unsigned long long, std::complex<float>, std::complex<double>,
-                   std::complex<long double>, std::any>;
+    using possible_types = std::tuple<
+        std::nullptr_t, char, signed char, unsigned char, wchar_t, char8_t, char16_t, char32_t,
+        std::string, std::wstring, std::u8string, std::u16string, std::u32string, std::string_view,
+        std::wstring_view, std::u8string_view, std::u16string_view, std::u32string_view,
+        std::filesystem::path, bool, short, unsigned short, int, unsigned int, long, unsigned long,
+        long long, unsigned long long, std::complex<float>, std::complex<double>,
+        std::complex<long double>, std::chrono::time_point<std::chrono::system_clock>,
+        std::chrono::time_point<std::chrono::steady_clock>,
+        std::chrono::time_point<std::chrono::high_resolution_clock>,
+#if __cpp_lib_chrono >= 201907L
+        std::chrono::time_point<std::chrono::utc_clock>,
+        std::chrono::time_point<std::chrono::tai_clock>,
+        std::chrono::time_point<std::chrono::gps_clock>,
+        std::chrono::time_point<std::chrono::file_clock>,
+        std::chrono::zoned_time<std::chrono::seconds>,
+        std::chrono::zoned_time<std::chrono::milliseconds>,
+        std::chrono::zoned_time<std::chrono::microseconds>,
+        std::chrono::zoned_time<std::chrono::nanoseconds>, std::chrono::years, std::chrono::months,
+        std::chrono::weeks, std::chrono::days,
+#endif
+        std::chrono::hours, std::chrono::minutes, std::chrono::seconds, std::chrono::milliseconds,
+        std::chrono::microseconds, std::chrono::nanoseconds,
+#if __cpp_lib_chrono >= 201907L
+        std::chrono::year, std::chrono::month, std::chrono::day, std::chrono::weekday,
+        std::chrono::weekday_indexed, std::chrono::weekday_last, std::chrono::month_day,
+        std::chrono::month_day_last, std::chrono::month_weekday, std::chrono::month_weekday_last,
+        std::chrono::year_month, std::chrono::year_month_day, std::chrono::year_month_day_last,
+        std::chrono::year_month_weekday, std::chrono::year_month_weekday_last,
+#endif
+        std::any>;
 
     const auto &type = value.type();
 
