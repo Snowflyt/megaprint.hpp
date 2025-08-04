@@ -33,6 +33,7 @@
 #include <algorithm>
 #include <any>
 #include <array>
+#include <atomic>
 #include <bitset>
 #include <cctype>
 #include <charconv>
@@ -4646,6 +4647,8 @@ template <typename T>
     return text(c.special("&w[expired]"));
   } else if constexpr (detail::is_specialization_v<U, std::reference_wrapper>) {
     return inplace_expand(value.get());
+  } else if constexpr (detail::is_specialization_v<U, std::atomic>) {
+    return inplace_expand(value.load());
   } else if constexpr (detail::is_specialization_v<U, std::variant>) {
     return std::visit(inplace_expand, value);
   } else if constexpr (
