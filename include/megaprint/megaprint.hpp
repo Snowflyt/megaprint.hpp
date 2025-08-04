@@ -4696,11 +4696,11 @@ template <typename T>
       std::optional<std::unique_ptr<mp::node::node>> prefix;
 
       std::vector<std::unique_ptr<mp::node::node>> entries;
-      // C-array/array/span/vector/list/deque
+      // C-array/array/span/vector/list/deque/valarray
       if constexpr (std::is_array_v<U> || is_std_array_v<U> || is_span_v<U> ||
                     is_specialization_v<U, std::vector> || is_specialization_v<U, std::list> ||
                     is_specialization_v<U, std::forward_list> ||
-                    is_specialization_v<U, std::deque>) {
+                    is_specialization_v<U, std::deque> || is_specialization_v<U, std::valarray>) {
         std::size_t size;
         if constexpr (std::is_array_v<U>)
           size = std::extent_v<U>;
@@ -4733,6 +4733,8 @@ template <typename T>
           prefix = text("forward_list(" + std::to_string(size) + ") ");
         else if constexpr (is_specialization_v<U, std::deque>)
           prefix = text("deque(" + std::to_string(size) + ") ");
+        else if constexpr (is_specialization_v<U, std::valarray>)
+          prefix = text("valarray(" + std::to_string(size) + ") ");
       }
       // stack
       else if constexpr (detail::is_specialization_v<U, std::stack>) {

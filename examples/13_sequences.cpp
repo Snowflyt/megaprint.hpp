@@ -2,6 +2,7 @@
 #include <forward_list>
 #include <list>
 #include <span>
+#include <valarray>
 #include <vector>
 
 #include <megaprint/megaprint.hpp>
@@ -19,6 +20,11 @@ auto main() -> int {
 
   std::deque<int> deq{1, 2, 3, 4};
   mp::println("deque:", deq);
+
+  std::valarray<int> val_arr{1, 2, 3, 4};
+  mp::println("valarray:", val_arr);
+  std::valarray<int> val_arr_doubled = val_arr * 2;
+  mp::println("valarray * 2:", val_arr_doubled);
 
   return 0;
 }
