@@ -1,4 +1,5 @@
 #include <cstddef>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -13,6 +14,10 @@ struct Person {
 auto main() -> int {
   std::nullptr_t null_ptr = nullptr;
   mp::println("null pointer:", null_ptr);
+
+  int n = 42;
+  std::reference_wrapper<int> ref = std::ref(n);
+  mp::println("reference wrapper:", ref);
 
   Person p1 = {.name = "Alice", .birth_year = 1990, .friends = {}};
   Person p2 = {.name = "Bob", .birth_year = 1992, .friends = {}};

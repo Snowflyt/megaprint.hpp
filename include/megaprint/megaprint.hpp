@@ -4340,6 +4340,8 @@ template <typename T>
                       inplace_expand(*locked));
     }
     return text(c.special("&w[expired]"));
+  } else if constexpr (detail::is_specialization_v<U, std::reference_wrapper>) {
+    return inplace_expand(value.get());
   } else if constexpr (detail::is_specialization_v<U, std::variant>) {
     return std::visit(inplace_expand, value);
   } else if constexpr (
