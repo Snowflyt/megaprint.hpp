@@ -42,6 +42,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <deque>
+#include <exception>
 #include <filesystem>
 #include <forward_list>
 #include <functional>
@@ -52,16 +53,20 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <new>
 #include <optional>
 #include <ostream>
 #include <queue>
 #include <set>
 #include <sstream>
 #include <stack>
+#include <stdexcept>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <tuple>
 #include <type_traits>
+#include <typeinfo>
 #include <unordered_map>
 #include <unordered_set>
 #include <variant>
@@ -73,8 +78,13 @@
 
 #ifdef _WIN32
 #define NOMINMAX
+// clang-format off
 #include <windows.h> // For supports_color
+#include <dbghelp.h> // For demangling
+// clang-format on
+#pragma comment(lib, "Dbghelp.lib")
 #else
+#include <cxxabi.h> // For demangling
 #include <unistd.h> // For supports_color
 #endif
 
@@ -200,6 +210,34 @@ template <typename T> inline constexpr bool is_pair_v = is_pair<std::remove_cvre
 template <typename T> struct is_tuple : std::false_type {};
 template <typename... Ts> struct is_tuple<std::tuple<Ts...>> : std::true_type {};
 template <typename T> inline constexpr bool is_tuple_v = is_tuple<std::remove_cvref_t<T>>::value;
+
+[[nodiscard]] inline auto demangle(const char *name) -> std::string {
+#if defined(_MSC_VER)
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+  std::array<char, 1024> buffer;
+  if (UnDecorateSymbolName(name, buffer.data(), buffer.size(), UNDNAME_COMPLETE)) {
+    std::string res = buffer.data();
+    if (res.starts_with("struct "))
+      // Skip 'struct '
+      res.erase(0, 7);
+    else if (res.starts_with("union ") || res.starts_with("class "))
+      // Skip 'union ' or 'class '
+      res.erase(0, 6);
+    else if (res.starts_with("enum "))
+      // Skip 'enum '
+      res.erase(0, 5);
+    return res;
+  }
+  return name;
+#elif defined(__GNUC__) || defined(__clang__)
+  int status;
+  std::unique_ptr<char, decltype(&std::free)> demangled(
+      abi::__cxa_demangle(name, nullptr, nullptr, &status), &std::free);
+  return (status == 0 && demangled) ? demangled.get() : name;
+#else
+  return name;
+#endif
+}
 
 // https://rodusek.com/posts/2021/03/09/getting-an-unmangled-type-name-at-compile-time/
 template <typename T> consteval auto type_name_array() {
@@ -3224,6 +3262,7 @@ struct styles {
   color number = color::yellow;
   color boolean = color::yellow;
   color enumeration = color::cyan;
+  color error = color::red;
   color null = color::bold;
   color time = color::magenta;
   color special = color::cyan;
@@ -3328,6 +3367,9 @@ public:
   }
   [[nodiscard]] auto enumeration(std::string_view s) const -> std::string {
     return enabled_ ? colorize(s, styles_.enumeration) : std::string(s);
+  }
+  [[nodiscard]] auto error(std::string_view s) const -> std::string {
+    return enabled_ ? colorize(s, styles_.error) : std::string(s);
   }
   [[nodiscard]] auto null(std::string_view s) const -> std::string {
     return enabled_ ? colorize(s, styles_.null) : std::string(s);
@@ -4117,6 +4159,10 @@ concept simple_type =
     std::same_as<std::remove_cvref_t<T>, std::filesystem::path> ||
     std::same_as<std::remove_cvref_t<T>, bool> || std::is_arithmetic_v<std::remove_cvref_t<T>> ||
     is_specialization_v<std::remove_cvref_t<T>, std::complex> ||
+    std::is_base_of_v<std::exception, std::remove_cvref_t<T>> ||
+    std::same_as<std::remove_cvref_t<T>, std::exception_ptr> ||
+    std::same_as<std::remove_cvref_t<T>, std::error_code> ||
+    std::same_as<std::remove_cvref_t<T>, std::error_condition> ||
     std::same_as<std::remove_cvref_t<T>, std::chrono::time_point<std::chrono::system_clock>> ||
     std::same_as<std::remove_cvref_t<T>, std::chrono::time_point<std::chrono::steady_clock>> ||
     std::same_as<std::remove_cvref_t<T>,
@@ -4185,6 +4231,27 @@ template <simple_type T>
     return c.number(stringify_number(std::forward<T>(value), numeric_separator));
   } else if constexpr (is_specialization_v<U, std::complex>) {
     return c.number(stringify_number(value.real()) + "+" + stringify_number(value.imag()) + "i");
+  } else if constexpr (std::is_base_of_v<std::exception, U> ||
+                       std::same_as<U, std::exception_ptr>) {
+    std::string error_name;
+    std::string what;
+    if constexpr (std::is_base_of_v<std::exception, U>) {
+      error_name = demangle(typeid(value).name());
+      what = value.what();
+    } else {
+      try {
+        std::rethrow_exception(value);
+      } catch (const std::exception &e) {
+        error_name = demangle(typeid(e).name());
+        what = e.what();
+      }
+    }
+    if (error_name.starts_with("std::"))
+      error_name.erase(0, 5); // Remove "std::" prefix
+    return c.error(error_name) + ": " + c.bold(what);
+  } else if constexpr (std::same_as<U, std::error_code> || std::same_as<U, std::error_condition>) {
+    return c.error(value.category().name()) + c.gray("(" + std::to_string(value.value()) + ")") +
+           ": " + c.bold(value.message());
   } else if constexpr (std::same_as<U, std::chrono::time_point<std::chrono::system_clock>>
 #if __cpp_lib_chrono >= 201907L
                        || std::same_as<U, std::chrono::time_point<std::chrono::utc_clock>> ||
@@ -4432,7 +4499,12 @@ template <typename T>
         std::wstring_view, std::u8string_view, std::u16string_view, std::u32string_view,
         std::filesystem::path, bool, short, unsigned short, int, unsigned int, long, unsigned long,
         long long, unsigned long long, std::complex<float>, std::complex<double>,
-        std::complex<long double>, std::chrono::time_point<std::chrono::system_clock>,
+        std::complex<long double>, std::exception, std::logic_error, std::domain_error,
+        std::invalid_argument, std::length_error, std::runtime_error, std::range_error,
+        std::overflow_error, std::underflow_error, std::bad_alloc, std::bad_cast, std::bad_typeid,
+        std::bad_exception, std::system_error, std::ios_base::failure,
+        std::filesystem::filesystem_error, std::exception_ptr,
+        std::chrono::time_point<std::chrono::system_clock>,
         std::chrono::time_point<std::chrono::steady_clock>,
         std::chrono::time_point<std::chrono::high_resolution_clock>,
 #if __cpp_lib_chrono >= 201907L
