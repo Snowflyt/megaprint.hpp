@@ -33,11 +33,13 @@
 #include <algorithm>
 #include <any>
 #include <array>
+#include <bitset>
 #include <cctype>
 #include <charconv>
 #include <chrono>
 #include <compare>
 #include <complex>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -202,6 +204,10 @@ inline constexpr bool is_specialization_v = is_specialization<T, Ref>::value;
 template <typename T> struct is_std_array : std::false_type {};
 template <typename T, std::size_t N> struct is_std_array<std::array<T, N>> : std::true_type {};
 template <typename T> inline constexpr bool is_std_array_v = is_std_array<T>::value;
+
+template <typename T> struct is_bitset : std::false_type {};
+template <std::size_t N> struct is_bitset<std::bitset<N>> : std::true_type {};
+template <typename T> inline constexpr bool is_bitset_v = is_bitset<std::remove_cvref_t<T>>::value;
 
 template <typename T> struct is_pair : std::false_type {};
 template <typename T1, typename T2> struct is_pair<std::pair<T1, T2>> : std::true_type {};
@@ -4148,7 +4154,8 @@ auto stringify_number(T value, std::variant<bool, std::string_view> numeric_sepa
 // `mp::println(...)` is only used to print simple types.
 template <typename T>
 concept simple_type =
-    std::is_null_pointer_v<std::remove_cvref_t<T>> || std::is_enum_v<std::remove_cvref_t<T>> ||
+    std::is_null_pointer_v<std::remove_cvref_t<T>> ||
+    std::same_as<std::remove_cvref_t<T>, std::byte> || std::is_enum_v<std::remove_cvref_t<T>> ||
     std::same_as<std::remove_cvref_t<T>, char> ||
     std::same_as<std::remove_cvref_t<T>, signed char> ||
     std::same_as<std::remove_cvref_t<T>, unsigned char> ||
@@ -4163,6 +4170,8 @@ concept simple_type =
     std::same_as<std::remove_cvref_t<T>, std::exception_ptr> ||
     std::same_as<std::remove_cvref_t<T>, std::error_code> ||
     std::same_as<std::remove_cvref_t<T>, std::error_condition> ||
+    std::same_as<std::remove_cvref_t<T>, std::vector<bool>> ||
+    is_bitset_v<std::remove_cvref_t<T>> ||
     std::same_as<std::remove_cvref_t<T>, std::chrono::time_point<std::chrono::system_clock>> ||
     std::same_as<std::remove_cvref_t<T>, std::chrono::time_point<std::chrono::steady_clock>> ||
     std::same_as<std::remove_cvref_t<T>,
@@ -4213,6 +4222,11 @@ template <simple_type T>
 
   if constexpr (std::is_null_pointer_v<U>) {
     return c.null("nullptr");
+  } else if constexpr (std::same_as<U, std::byte>) {
+    const int byte_value = std::to_integer<int>(value);
+    std::ostringstream oss;
+    oss << std::hex << std::setfill('0') << std::setw(2) << byte_value;
+    return c.number(std::to_string(byte_value)) + " (" + c.number("0x" + oss.str()) + ")";
   } else if constexpr (std::is_enum_v<U>) {
     return c.enumeration(std::string(enum_type_name_with_name(std::forward<T>(value))));
   } else if constexpr (std::same_as<U, char> || std::same_as<U, signed char> ||
@@ -4252,6 +4266,19 @@ template <simple_type T>
   } else if constexpr (std::same_as<U, std::error_code> || std::same_as<U, std::error_condition>) {
     return c.error(value.category().name()) + c.gray("(" + std::to_string(value.value()) + ")") +
            ": " + c.bold(value.message());
+  } else if constexpr (std::same_as<U, std::vector<bool>>) {
+    // Special case for std::vector<bool>
+    std::ostringstream oss;
+    for (std::size_t i = 0; i < value.size(); i++)
+      oss << (value[i] ? '1' : '0');
+    return "[" + c.number(oss.str()) + "]";
+  } else if constexpr (is_bitset_v<U>) {
+    char buffer[sizeof(U) * 8 + 1]; // +1 for null terminator
+    const std::size_t size = value.size();
+    for (std::size_t i = 0; i < size; i++)
+      buffer[i] = value.test(i) ? '1' : '0';
+    buffer[size] = '\0'; // Null-terminate the string
+    return "<" + std::to_string(size) + ">[" + c.number(buffer) + "]";
   } else if constexpr (std::same_as<U, std::chrono::time_point<std::chrono::system_clock>>
 #if __cpp_lib_chrono >= 201907L
                        || std::same_as<U, std::chrono::time_point<std::chrono::utc_clock>> ||
@@ -4494,16 +4521,17 @@ template <typename T>
     // Check some common types that std::any can hold
     // Listing more types is technically possible but will bloat the code size
     using possible_types = std::tuple<
-        std::nullptr_t, char, signed char, unsigned char, wchar_t, char8_t, char16_t, char32_t,
-        std::string, std::wstring, std::u8string, std::u16string, std::u32string, std::string_view,
-        std::wstring_view, std::u8string_view, std::u16string_view, std::u32string_view,
-        std::filesystem::path, bool, short, unsigned short, int, unsigned int, long, unsigned long,
-        long long, unsigned long long, std::complex<float>, std::complex<double>,
-        std::complex<long double>, std::exception, std::logic_error, std::domain_error,
-        std::invalid_argument, std::length_error, std::runtime_error, std::range_error,
-        std::overflow_error, std::underflow_error, std::bad_alloc, std::bad_cast, std::bad_typeid,
-        std::bad_exception, std::system_error, std::ios_base::failure,
-        std::filesystem::filesystem_error, std::exception_ptr,
+        std::nullptr_t, std::byte, char, signed char, unsigned char, wchar_t, char8_t, char16_t,
+        char32_t, std::string, std::wstring, std::u8string, std::u16string, std::u32string,
+        std::string_view, std::wstring_view, std::u8string_view, std::u16string_view,
+        std::u32string_view, std::filesystem::path, bool, short, unsigned short, int, unsigned int,
+        long, unsigned long, long long, unsigned long long, std::complex<float>,
+        std::complex<double>, std::complex<long double>, std::exception, std::logic_error,
+        std::domain_error, std::invalid_argument, std::length_error, std::runtime_error,
+        std::range_error, std::overflow_error, std::underflow_error, std::bad_alloc, std::bad_cast,
+        std::bad_typeid, std::bad_exception, std::system_error, std::ios_base::failure,
+        std::filesystem::filesystem_error, std::exception_ptr, std::vector<bool>, std::bitset<4>,
+        std::bitset<8>, std::bitset<16>, std::bitset<32>, std::bitset<64>,
         std::chrono::time_point<std::chrono::system_clock>,
         std::chrono::time_point<std::chrono::steady_clock>,
         std::chrono::time_point<std::chrono::high_resolution_clock>,
