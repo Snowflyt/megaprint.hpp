@@ -25,14 +25,14 @@
 
 ## Quick Start
 
-**megaprint** is a single-header C++ 20 library. To start, make sure you have a compiler that supports C++ 20. GCC ≥ 11, Clang ≥ 12, and MSVC ≥ 2022 have been tested to work.
+**megaprint** is a single-header C++ 20 library. To start, make sure you have a compiler that supports C++ 20. GCC ≥ 11, Clang ≥ 12, and MSVC ≥ 19.42 have been tested to work.
 
 - The simplest way to use **megaprint** is to grab the single header file `include/megaprint/megaprint.hpp` and include it in your project.
 - Alternatively, you can use [CPM.cmake](https://github.com/cpm-cmake/CPM.cmake) to add megaprint as a dependency in your CMake project:
 
   ```cmake
   include(CPM.cmake)
-  CPMAddPackage("gh:Snowflyt/megaprint.hpp@0.1.1") # or above
+  CPMAddPackage("gh:Snowflyt/megaprint.hpp@0.1.2") # or above
   target_link_libraries(your_target_name PRIVATE megaprint::megaprint)
   ```
 

@@ -8,7 +8,7 @@ else()
 endif()
 
 project(megaprint
-  VERSION 0.1.1
+  VERSION 0.1.2
   DESCRIPTION "Human-friendly pretty printer for C++ 20"
   HOMEPAGE_URL "https://github.com/Snowflyt/megaprint.hpp"
   LANGUAGES CXX
