@@ -3270,6 +3270,7 @@ enum class color : std::uint8_t {
 };
 
 struct styles {
+  // NOLINTBEGIN(misc-non-private-member-variables-in-classes)
   color string = color::green;
   color character = color::green;
   color number = color::yellow;
@@ -3279,6 +3280,7 @@ struct styles {
   color null = color::bold;
   color time = color::magenta;
   color special = color::cyan;
+  // NOLINTEND(misc-non-private-member-variables-in-classes)
 
   [[nodiscard]] auto operator==(const styles &other) const -> bool = default;
   [[nodiscard]] auto operator!=(const styles &other) const -> bool { return !(*this == other); }
@@ -4409,6 +4411,7 @@ template <simple_type T>
 #endif
         if constexpr (std::same_as<U, std::chrono::hours>)
       unit = "h";
+    // NOLINTBEGIN(readability-misleading-indentation)
     else if constexpr (std::same_as<U, std::chrono::minutes>)
       unit = "min";
     else if constexpr (std::same_as<U, std::chrono::seconds>)
@@ -4419,6 +4422,7 @@ template <simple_type T>
       unit = "μs";
     else if constexpr (std::same_as<U, std::chrono::nanoseconds>)
       unit = "ns";
+    // NOLINTEND(readability-misleading-indentation)
     return c.time(stringify_number(value.count(), numeric_separator) + unit);
   } else if constexpr (requires {
                          { value.inspect() } -> string_type;
