@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.14)
 
 project(megaprint_tests)
 
+option(MEGAPRINT_ENABLE_COVERAGE "Enable test coverage")
+
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -46,12 +48,30 @@ if(IWYU_PATH)
   endforeach()
 endif()
 
+if(MEGAPRINT_ENABLE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    add_compile_options(-O0 -g -fprofile-instr-generate -fcoverage-mapping)
+    add_link_options(-fprofile-instr-generate)
+  else() # GCC
+    add_compile_options(-O0 -g --coverage)
+    add_link_options(--coverage)
+  endif()
+endif()
+
 enable_testing()
 include(CTest)
 
 include_directories("../include" ".")
 file(GLOB MEGAPRINT_TEST_SOURCES test_*.cpp)
-add_executable(megaprint_tests ${MEGAPRINT_TEST_SOURCES})
+
+# Generate a translation unit that implements doctest main
+set(DOCTEST_MAIN_CPP "${CMAKE_CURRENT_BINARY_DIR}/doctest_main.cpp")
+file(GENERATE
+  OUTPUT "${DOCTEST_MAIN_CPP}"
+  CONTENT "#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN\n#include <doctest/doctest.h>\n"
+)
+
+add_executable(megaprint_tests ${MEGAPRINT_TEST_SOURCES} "${DOCTEST_MAIN_CPP}")
 set_target_properties(megaprint_tests PROPERTIES OUTPUT_NAME tests)
 
 # Set ${PROJECT_NAME} as the startup project
@@ -59,10 +79,6 @@ set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT m
 
 include(../cmake/CPM.cmake)
 
-CPMAddPackage(
-  URI "gh:doctest/doctest@2.4.12"
-  OPTIONS "DOCTEST_WITH_MAIN=ON"
-)
+CPMAddPackage("gh:doctest/doctest@2.4.12")
 
 target_link_libraries(megaprint_tests PRIVATE doctest::doctest)
-target_compile_definitions(megaprint_tests PRIVATE DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN)

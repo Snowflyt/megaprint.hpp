@@ -24,10 +24,12 @@ cmake-build*/
 *.exe
 *.out
 
-# Test & Profiling
+# Test & Profiling & Coverage
 *.gcno
 *.gcda
 *.profdata
+*.profraw
+coverage/
 
 # Editor directories and files
 .vscode/*
