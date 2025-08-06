@@ -4253,7 +4253,9 @@ template <simple_type T>
   } else if constexpr (std::is_arithmetic_v<U>) {
     return c.number(stringify_number(std::forward<T>(value), numeric_separator));
   } else if constexpr (is_specialization_v<U, std::complex>) {
-    return c.number(stringify_number(value.real()) + "+" + stringify_number(value.imag()) + "i");
+    const auto imag = value.imag();
+    return c.number(stringify_number(value.real()) + (imag >= 0 ? "+" : "") +
+                    stringify_number(imag) + "i");
   } else if constexpr (std::is_base_of_v<std::exception, U> ||
                        std::same_as<U, std::exception_ptr>) {
     std::string error_name;
